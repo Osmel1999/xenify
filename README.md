@@ -2,6 +2,27 @@
 
 A new Flutter project.
 
+## Structure:
+lib/
+├── core/
+│   ├── config/
+│   ├── providers/      # Riverpod providers globales
+│   └── theme/
+├── data/
+│   ├── repositories/
+│   ├── datasources/
+│   └── models/
+├── domain/
+│   ├── entities/
+│   ├── repositories/
+│   └── usecases/
+└── presentation/
+    ├── screens/
+    ├── widgets/
+    └── providers/      # Providers específicos de features
+        ├── notifiers/  # StateNotifier implementations
+        └── states/     # Estados inmutables
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.
