@@ -3,7 +3,7 @@
 A new Flutter project.
 
 ## Structure:
-'' plaintext
+
 lib/
 ├── core/
 │   ├── config/
@@ -23,7 +23,6 @@ lib/
     └── providers/      # Providers específicos de features
         ├── notifiers/  # StateNotifier implementations
         └── states/     # Estados inmutables
-        '''
 
 ## Getting Started
 
