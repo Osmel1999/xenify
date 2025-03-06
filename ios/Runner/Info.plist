@@ -22,12 +22,42 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>signinwithapple</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCalendarsUsageDescription</key>
+	<string>La aplicación necesita acceso al calendario para programar recordatorios de medicamentos y comidas.</string>
+	<key>NSLocalNotificationUsageDescription</key>
+	<string>La aplicación necesita permiso para enviar notificaciones sobre tus medicamentos y recordatorios de comidas.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Esta aplicación necesita acceso a la ubicación para proporcionar recomendaciones personalizadas basadas en tu región.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Esta aplicación necesita acceso a la ubicación para proporcionar recomendaciones personalizadas basadas en tu región.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>La aplicación necesita acceso a los recordatorios para gestionar tus medicamentos y horarios de comida.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>Necesitamos enviar notificaciones para recordarte tus medicamentos y rutinas.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>processing</string>
+		<string>fetch</string>
+		<string>audio</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -35,21 +65,13 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
-
-	<!-- Permisos de ubicación -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Esta aplicación necesita acceso a la ubicación para proporcionar recomendaciones personalizadas basadas en tu región.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Esta aplicación necesita acceso a la ubicación para proporcionar recomendaciones personalizadas basadas en tu región.</string>
 </dict>
 </plist>
