@@ -1,6 +1,7 @@
 import 'package:xenify/domain/entities/family_condition.dart';
 import 'package:xenify/domain/entities/medication.dart';
 import 'package:xenify/domain/entities/location_data.dart';
+import 'package:xenify/domain/entities/question.dart';
 
 class QuestionnaireState {
   final int currentQuestionIndex;
@@ -12,6 +13,10 @@ class QuestionnaireState {
   final LocationData? locationData;
   final String? currentProtein;
   final List<String> remainingProteins;
+  final bool isLowPerformanceMode;
+  final List<Question> loadedQuestions;
+  final int batchSize;
+  final String? currentQuestionText; // Nuevo campo para el texto personalizado
 
   QuestionnaireState({
     this.currentQuestionIndex = 0,
@@ -23,6 +28,10 @@ class QuestionnaireState {
     this.locationData,
     this.currentProtein,
     this.remainingProteins = const [],
+    this.isLowPerformanceMode = false,
+    this.loadedQuestions = const [],
+    this.batchSize = 10,
+    this.currentQuestionText,
   });
 
   QuestionnaireState copyWith({
@@ -35,6 +44,10 @@ class QuestionnaireState {
     LocationData? locationData,
     String? currentProtein,
     List<String>? remainingProteins,
+    bool? isLowPerformanceMode,
+    List<Question>? loadedQuestions,
+    int? batchSize,
+    String? currentQuestionText,
   }) {
     return QuestionnaireState(
       currentQuestionIndex: currentQuestionIndex ?? this.currentQuestionIndex,
@@ -46,6 +59,10 @@ class QuestionnaireState {
       locationData: locationData ?? this.locationData,
       currentProtein: currentProtein ?? this.currentProtein,
       remainingProteins: remainingProteins ?? this.remainingProteins,
+      isLowPerformanceMode: isLowPerformanceMode ?? this.isLowPerformanceMode,
+      loadedQuestions: loadedQuestions ?? this.loadedQuestions,
+      batchSize: batchSize ?? this.batchSize,
+      currentQuestionText: currentQuestionText ?? this.currentQuestionText,
     );
   }
 
@@ -61,6 +78,8 @@ class QuestionnaireState {
       'locationData': locationData?.toJson(),
       'currentProtein': currentProtein,
       'remainingProteins': remainingProteins,
+      'isLowPerformanceMode': isLowPerformanceMode,
+      'batchSize': batchSize,
     };
   }
 
@@ -126,6 +145,8 @@ class QuestionnaireState {
           : null,
       currentProtein: json['currentProtein'] as String?,
       remainingProteins: List<String>.from(json['remainingProteins'] ?? []),
+      isLowPerformanceMode: json['isLowPerformanceMode'] as bool? ?? false,
+      batchSize: json['batchSize'] as int? ?? 10,
     );
   }
 

@@ -61,6 +61,22 @@ dependencies:
   geolocator: ^10.1.0
   geocoding: ^2.1.1
 
+  # Notificaciones
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.2
+
+  #UI resources
+  percent_indicator: ^4.2.2
+  fl_chart: ^0.70.2
+
+  # Firebase
+  firebase_core: 
+  firebase_auth: 
+  cloud_firestore: 
+  google_sign_in: 
+  sign_in_with_apple: 
+  crypto:   # Para generar nonces para Sign in with Apple
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -90,7 +106,8 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
+  assets:
+    - assets/sounds/
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
 

@@ -1,0 +1,100 @@
+ESTRUCTURA DE LA CARPETA LIB
+============================
+
+lib/
+├── main.dart (Punto de entrada de la aplicación)
+│
+├── core/
+│   ├── config/
+│   ├── providers/
+│   └── theme/
+│
+├── data/
+│   ├── auth_service.dart
+│   ├── daily_questionnaire_service.dart
+│   ├── firestore_service.dart
+│   ├── local_storage.dart
+│   ├── notification_service.dart
+│   ├── provider_container.dart
+│   ├── datasources/
+│   ├── models/
+│   └── repositories/
+│
+├── domain/
+│   ├── entities/
+│   │   ├── daily_questionnaire_response.dart
+│   │   ├── daily_questionnaire_type.dart
+│   │   ├── family_condition.dart
+│   │   ├── location_data.dart
+│   │   ├── meal_notification_config.dart
+│   │   ├── medication.dart
+│   │   ├── notification_data.dart
+│   │   ├── question.dart
+│   │   ├── questionnaire_state.dart
+│   │   └── user_profile.dart
+│   ├── repositories/
+│   └── usecases/
+│
+└── presentation/
+    ├── providers/
+    │   ├── auth_provider.dart
+    │   ├── daily_questionnaire_provider.dart
+    │   ├── notification_provider.dart
+    │   ├── questionnaire_provider.dart
+    │   ├── notifiers/
+    │   │   ├── daily_questionnaire_notifier.dart
+    │   │   └── questionnaire_notifier.dart
+    │   └── states/
+    │       └── daily_questionnaire_state.dart
+    │
+    ├── screens/
+    │   ├── auth_screen.dart
+    │   ├── dashboard_screen.dart
+    │   ├── home_screen.dart
+    │   ├── questionnaire_screen.dart
+    │   └── user_data_completion_screen.dart
+    │
+    ├── theme/
+    │   └── questionnaire_theme.dart
+    │
+    └── widgets/
+        ├── family_history_form.dart
+        ├── medication_form.dart
+        ├── question_widget_updated.dart
+        ├── question_widget.dart
+        │
+        ├── common/
+        │   ├── circular_percent_indicator_widget.dart
+        │   ├── nutrient_column_widget.dart
+        │   ├── nutrient_row_widget.dart
+        │   ├── symptom_chip_widget.dart
+        │   └── wellbeing_indicator_widget.dart
+        │
+        ├── daily_questionnaire/
+        │   ├── daily_questionnaire_checker.dart
+        │   └── daily_questionnaire_modal.dart
+        │
+        ├── dashboard/
+        │   ├── bottom_navigation_widget.dart
+        │   ├── digestive_health_card_widget.dart
+        │   ├── header_widget.dart
+        │   ├── hydration_card_widget.dart
+        │   ├── meal_tracking_card_widget.dart
+        │   ├── medication_reminder_card_widget.dart
+        │   ├── metrics_row_widget.dart
+        │   └── wellbeing_card_widget.dart
+        │
+        └── questionnaire/
+            ├── progress_bar_widget.dart
+            ├── questionnaire_navigation.dart
+            │
+            ├── animations/
+            │   ├── contextual_animations.dart
+            │   └── question_animations.dart
+            │
+            └── question_types/
+                ├── multiple_selection_widget.dart
+                ├── rating_widget.dart
+                ├── single_selection_widget.dart
+                ├── slider_widget.dart
+                └── text_input_widget.dart

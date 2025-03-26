@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xenify/domain/entities/question.dart';
 import 'package:xenify/domain/entities/questionnaire_state.dart';
+import 'package:xenify/presentation/providers/notification_provider.dart';
 import 'package:xenify/presentation/providers/notifiers/questionnaire_notifier.dart';
 
 final questionsList = [
-  // Pregunta de ubicación
+  // Pregunta de ubicación (se mantiene como primera pregunta)
   Question(
     id: 'location',
     text:
@@ -13,18 +14,20 @@ final questionsList = [
     isRequired: true,
   ),
 
-  // Preguntas demográficas
   Question(
     id: 'birth_date',
     text: '¿Cuál es su fecha de nacimiento?',
     type: QuestionType.date,
   ),
+
   Question(
     id: 'gender',
     text: '¿Cuál es su género?',
     type: QuestionType.select,
-    options: ['Masculino', 'Femenino', 'No binario', 'Prefiero no decir'],
+    options: ['Masculino', 'Femenino', 'Prefiero no decir'],
   ),
+
+  // Preguntas demográficas y ocupación
   Question(
     id: 'occupation_type',
     text: '¿A qué te dedicas actualmente?',
@@ -37,6 +40,65 @@ final questionsList = [
     type: QuestionType.text,
     hint: 'Ej: Ingeniero de Software, Médico, etc.',
     isRequired: true,
+  ),
+
+  // Nuevas preguntas de hábitos de sueño
+  Question(
+    id: 'wake_up_time',
+    text: '¿A qué hora sueles despertarte habitualmente?',
+    type: QuestionType.time,
+  ),
+
+  Question(
+    id: 'bed_time',
+    text: '¿A qué hora sueles acostarte habitualmente?',
+    type: QuestionType.time,
+  ),
+
+  // Nuevas preguntas de hábitos alimenticios
+  Question(
+    id: 'breakfast_time',
+    text: '¿A qué hora sueles desayunar?',
+    type: QuestionType.select,
+    options: [
+      'No aplica',
+      '5:00 - 6:00',
+      '6:00 - 7:00',
+      '7:00 - 8:00',
+      '8:00 - 9:00',
+      '9:00 - 10:00',
+      'Después de las 10:00'
+    ],
+  ),
+
+  Question(
+    id: 'lunch_time',
+    text: '¿A qué hora sueles almorzar?',
+    type: QuestionType.select,
+    options: [
+      'No aplica',
+      '11:00 - 12:00',
+      '12:00 - 13:00',
+      '13:00 - 14:00',
+      '14:00 - 15:00',
+      '15:00 - 16:00',
+      'Después de las 16:00'
+    ],
+  ),
+
+  Question(
+    id: 'dinner_time',
+    text: '¿A qué hora sueles cenar?',
+    type: QuestionType.select,
+    options: [
+      'No aplica',
+      '17:00 - 18:00',
+      '18:00 - 19:00',
+      '19:00 - 20:00',
+      '20:00 - 21:00',
+      '21:00 - 22:00',
+      'Después de las 22:00'
+    ],
   ),
 
   // Preguntas de patología
@@ -112,8 +174,67 @@ final questionsList = [
       'Vegana',
       'Cetogénica',
       'Sin gluten',
-      'Otra'
     ],
+  ),
+
+  // Preguntas específicas para dieta sin gluten
+  Question(
+    id: 'gluten_awareness',
+    text: '¿Cuál es la razón principal por la que sigues una dieta sin gluten?',
+    type: QuestionType.select,
+    options: [
+      'Celiaquía diagnosticada',
+      'Sensibilidad al gluten',
+      'Decisión personal',
+      'Recomendación médica',
+    ],
+    parentId: 'diet_type',
+    dependsOn: ['Sin gluten'],
+  ),
+
+  Question(
+    id: 'gluten_substitutes',
+    text: '¿Qué sustitutos de cereales con gluten consumes?',
+    type: QuestionType.multiSelect,
+    options: [
+      'Arroz',
+      'Quinoa',
+      'Amaranto',
+      'Maíz',
+      'Trigo sarraceno',
+      'Harina de almendras',
+      'Harina de coco',
+    ],
+    parentId: 'diet_type',
+    dependsOn: ['Sin gluten'],
+  ),
+
+  Question(
+    id: 'gluten_free_proteins',
+    text: '¿Qué fuentes de proteína consumes principalmente?',
+    type: QuestionType.multiSelect,
+    options: [
+      'Pollo',
+      'Pescado',
+      'Res',
+      'Cerdo',
+      'Huevo',
+      'Legumbres',
+      'Quinoa',
+      'Frutos secos',
+      'Tofu',
+      'Tempeh',
+    ],
+    parentId: 'diet_type',
+    dependsOn: ['Sin gluten'],
+  ),
+
+  Question(
+    id: 'gluten_free_protein_frequency',
+    text: '¿Cuántas veces a la semana consumes %protein%?',
+    type: QuestionType.frequencySelect,
+    options: ['1 vez', '2 veces', '3 veces', '4 veces', '5 o más veces'],
+    parentId: 'gluten_free_proteins',
   ),
 
   // Preguntas específicas para dieta omnívora
@@ -235,5 +356,9 @@ int getNextQuestionIndex(String currentId, dynamic answer, int currentIndex) {
 
 final questionsProvider =
     StateNotifierProvider<QuestionnaireNotifier, QuestionnaireState>((ref) {
-  return QuestionnaireNotifier();
+  final notificationService = ref.watch(notificationServiceProvider);
+  return QuestionnaireNotifier(notificationService);
 });
+
+/// Proveedor para controlar si las animaciones están habilitadas
+final animationsEnabledProvider = StateProvider<bool>((ref) => true);

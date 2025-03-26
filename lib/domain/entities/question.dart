@@ -26,6 +26,7 @@ enum QuestionType {
   text,
   number,
   date,
+  time,
   select,
   multiSelect,
   medication,
