@@ -105,6 +105,7 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
 
   // Pantalla de cuestionario completado
   Widget _buildCompletionScreen(BuildContext context) {
+    var media = MediaQuery.of(context).size;
     return Center(
       child: SequentialAnimator(
         children: [
@@ -143,31 +144,36 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
             ),
           ),
           const SizedBox(height: 40),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-              textStyle:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () {
-              // Retrasar la navegación para permitir que se vea la animación
-              if (!mounted) return;
-              // Marcar como completado en Firebase
-              ref.read(questionsProvider.notifier).completeQuestionnaire();
-
-              // Navegar al dashboard
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => const DashboardScreen(),
+          Container(
+            // width: media.width * 0.6,
+            margin: EdgeInsets.symmetric(horizontal: media.width * 0.2),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 25),
+                textStyle:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              );
-            },
-            child: const Text('Finalizar'),
+              ),
+              onPressed: () {
+                // Retrasar la navegación para permitir que se vea la animación
+                if (!mounted) return;
+                // Marcar como completado en Firebase
+                ref.read(questionsProvider.notifier).completeQuestionnaire();
+
+                // Navegar al dashboard
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const DashboardScreen(),
+                  ),
+                );
+              },
+              child: const Text('Finalizar'),
+            ),
           ),
         ],
       ),
