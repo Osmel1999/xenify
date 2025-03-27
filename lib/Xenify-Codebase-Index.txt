@@ -1,0 +1,258 @@
+# Xenify-Codebase-Index
+
+## Estructura de Archivos y Componentes
+
+### Pantallas Principales
+| Pantalla | Archivo | Ruta | Propósito |
+|----------|---------|------|-----------|
+| Inicio de Sesión | `auth_screen.dart` | `lib/presentation/screens/auth_screen.dart` | Autenticación de usuario con métodos de plataforma |
+| Cuestionario | `questionnaire_screen.dart` | `lib/presentation/screens/questionnaire_screen.dart` | Gestiona el cuestionario inicial adaptativo |
+| Dashboard | `dashboard_screen.dart` | `lib/presentation/screens/dashboard_screen.dart` | Pantalla principal con resumen de métricas de salud |
+| Completar Perfil | `user_data_completion_screen.dart` | `lib/presentation/screens/user_data_completion_screen.dart` | Formulario para completar datos faltantes del perfil |
+
+### Componentes de UI
+| Componente | Archivo | Ruta | Propósito |
+|------------|---------|------|-----------|
+| Pregunta | `question_widget_updated.dart` | `lib/presentation/widgets/question_widget_updated.dart` | Renderiza preguntas adaptativas del cuestionario |
+| Formulario de Medicación | `medication_form.dart` | `lib/presentation/widgets/medication_form.dart` | Permite agregar/eliminar medicamentos |
+| Formulario de Historial Familiar | `family_history_form.dart` | `lib/presentation/widgets/family_history_form.dart` | Gestiona condiciones familiares |
+| Header | `header_widget.dart` | `lib/presentation/widgets/dashboard/header_widget.dart` | Muestra información del usuario y métricas rápidas |
+| Estado de Bienestar | `wellbeing_card_widget.dart` | `lib/presentation/widgets/dashboard/wellbeing_card_widget.dart` | Muestra diagnósticos y síntomas |
+| Métricas | `metrics_row_widget.dart` | `lib/presentation/widgets/dashboard/metrics_row_widget.dart` | Visualiza nutrición y actividad con gráficos |
+| Hidratación | `hydration_card_widget.dart` | `lib/presentation/widgets/dashboard/hydration_card_widget.dart` | Seguimiento de consumo de agua |
+| Alimentación | `meal_tracking_card_widget.dart` | `lib/presentation/widgets/dashboard/meal_tracking_card_widget.dart` | Seguimiento de comidas |
+| Salud Digestiva | `digestive_health_card_widget.dart` | `lib/presentation/widgets/dashboard/digestive_health_card_widget.dart` | Monitoreo digestivo |
+| Recordatorio de Medicamentos | `medication_reminder_card_widget.dart` | `lib/presentation/widgets/dashboard/medication_reminder_card_widget.dart` | Muestra próximos medicamentos |
+| Navegación Inferior | `bottom_navigation_widget.dart` | `lib/presentation/widgets/dashboard/bottom_navigation_widget.dart` | Barra de navegación principal |
+
+### Providers (Gestores de Estado)
+| Provider | Archivo | Ruta | Propósito |
+|----------|---------|------|-----------|
+| Auth | `auth_provider.dart` | `lib/presentation/providers/auth_provider.dart` | Gestiona estado de autenticación y perfil de usuario |
+| Cuestionario | `questionnaire_provider.dart` | `lib/presentation/providers/questionnaire_provider.dart` | Define preguntas y lógica de navegación |
+| Notifier Cuestionario | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Implementa lógica de actualización de estado del cuestionario |
+| Cuestionario Diario | `daily_questionnaire_provider.dart` | `lib/presentation/providers/daily_questionnaire_provider.dart` | Gestiona cuestionarios diarios |
+| Notificaciones | `notification_provider.dart` | `lib/presentation/providers/notification_provider.dart` | Acceso al servicio de notificaciones |
+
+### Servicios
+| Servicio | Archivo | Ruta | Propósito |
+|----------|---------|------|-----------|
+| Autenticación | `auth_service.dart` | `lib/data/auth_service.dart` | Gestiona autenticación con Firebase |
+| Firestore | `firestore_service.dart` | `lib/data/firestore_service.dart` | Operaciones con la base de datos Firestore |
+| Notificaciones | `notification_service.dart` | `lib/data/notification_service.dart` | Gestiona notificaciones locales |
+| Almacenamiento Local | `local_storage.dart` | `lib/data/local_storage.dart` | Operaciones con SharedPreferences |
+| Cuestionario Diario | `daily_questionnaire_service.dart` | `lib/data/daily_questionnaire_service.dart` | Gestiona respuestas de cuestionarios diarios |
+
+### Entidades
+| Entidad | Archivo | Ruta | Propósito |
+|---------|---------|------|-----------|
+| Perfil de Usuario | `user_profile.dart` | `lib/domain/entities/user_profile.dart` | Datos del usuario |
+| Pregunta | `question.dart` | `lib/domain/entities/question.dart` | Estructura de preguntas y tipos |
+| Estado de Cuestionario | `questionnaire_state.dart` | `lib/domain/entities/questionnaire_state.dart` | Estado completo del cuestionario |
+| Medicamento | `medication.dart` | `lib/domain/entities/medication.dart` | Datos de medicamentos |
+| Condición Familiar | `family_condition.dart` | `lib/domain/entities/family_condition.dart` | Historial médico familiar |
+| Ubicación | `location_data.dart` | `lib/domain/entities/location_data.dart` | Datos de ubicación del usuario |
+| Configuración de Comidas | `meal_notification_config.dart` | `lib/domain/entities/meal_notification_config.dart` | Config. de notificaciones de comidas |
+| Tipo de Cuestionario Diario | `daily_questionnaire_type.dart` | `lib/domain/entities/daily_questionnaire_type.dart` | Tipos de cuestionarios diarios |
+
+## Flujos de Interacción
+
+### 1. Autenticación de Usuario
+```
+Inicio → AuthScreen._signInWithPlatform() → AuthService.signInWithPlatform() 
+→ [Google/Apple auth] → AuthService._handleUserAuthentication() 
+→ FirestoreService.saveUserProfile() → authNotifierProvider actualiza estado → Redirección
+```
+
+**Archivos involucrados**:
+- `lib/presentation/screens/auth_screen.dart`
+- `lib/data/auth_service.dart`
+- `lib/data/firestore_service.dart`
+- `lib/presentation/providers/auth_provider.dart`
+
+**Botones/Interacciones**:
+- Botón "Iniciar con Google/Apple": `./_signInWithPlatform()` en `AuthScreen`
+
+### 2. Cuestionario Inicial
+```
+QuestionnaireScreen → questionsProvider → QuestionWidgetUpdated muestra pregunta
+→ Usuario responde → QuestionnaireNotifier.answerQuestion() → QuestionnaireNotifier._findNextQuestionIndex()
+→ [se repite hasta completar] → QuestionnaireNotifier.completeQuestionnaire()
+→ FirestoreService.markInitialQuestionnaireCompleted() → DashboardScreen
+```
+
+**Archivos involucrados**:
+- `lib/presentation/screens/questionnaire_screen.dart`
+- `lib/presentation/widgets/question_widget_updated.dart`
+- `lib/presentation/providers/questionnaire_provider.dart`
+- `lib/presentation/providers/notifiers/questionnaire_notifier.dart`
+
+**Botones/Interacciones**:
+- Botones de respuesta: `_buildInputField()` en `QuestionWidgetUpdated`
+- Botón "Siguiente"/"Finalizar": `_buildNavigationButtons()` en `QuestionnaireScreen`
+- Botón "Anterior": `_buildNavigationButtons()` en `QuestionnaireScreen`
+
+### 3. Dashboard Principal
+```
+DashboardScreen carga widgets → Cada widget obtiene datos de su provider
+→ Componentes muestran datos visuales → Usuario interactúa con tarjetas
+→ [Actualización] → Provider actualiza → Widget se reconstruye
+```
+
+**Archivos involucrados**:
+- `lib/presentation/screens/dashboard_screen.dart`
+- `lib/presentation/widgets/dashboard/*_widget.dart` (todos los widgets)
+
+**Botones/Interacciones**:
+- Botón "+" (FloatingActionButton): Agregar nuevo registro
+- Botón "Registrar" en `DigestiveHealthCardWidget`: Nuevo registro digestivo
+- Iconos de navegación en `BottomNavigationWidget`: Cambio de sección
+
+### 4. Notificaciones
+```
+NotificationService.initialize() → Configuración de canales
+→ NotificationService.scheduleMedicationNotifications() / schedulePostMealNotifications() / scheduleDailyQuestionnaireNotification()
+→ [Notificación aparece] → Usuario toca → NotificationService.activateDailyQuestionnaire()
+→ DailyQuestionnaireModal se muestra
+```
+
+**Archivos involucrados**:
+- `lib/data/notification_service.dart`
+- `lib/presentation/widgets/daily_questionnaire/daily_questionnaire_modal.dart`
+- `lib/presentation/providers/daily_questionnaire_provider.dart`
+
+**Botones/Interacciones**:
+- Tocar notificación: `onDidReceiveNotificationResponse` en `NotificationService`
+- Botones de respuesta en modal: `_buildAnswerOptions()` en `DailyQuestionnaireModal`
+
+## Métodos Clave por Funcionalidad
+
+### Gestión de Autenticación
+| Método | Archivo | Ruta | Propósito |
+|--------|---------|------|-----------|
+| `signInWithPlatform()` | `auth_service.dart` | `lib/data/auth_service.dart` | Detecta plataforma y elige método de login |
+| `signInWithGoogle()` | `auth_service.dart` | `lib/data/auth_service.dart` | Maneja flujo de autenticación con Google |
+| `signInWithApple()` | `auth_service.dart` | `lib/data/auth_service.dart` | Maneja flujo de autenticación con Apple |
+| `_handleUserAuthentication()` | `auth_service.dart` | `lib/data/auth_service.dart` | Procesa resultado de autenticación |
+| `signOut()` | `auth_service.dart` | `lib/data/auth_service.dart` | Cierra sesión |
+| `profileRequiresCompletion()` | `auth_service.dart` | `lib/data/auth_service.dart` | Verifica si faltan datos en perfil |
+
+### Cuestionarios
+| Método | Archivo | Ruta | Propósito |
+|--------|---------|------|-----------|
+| `answerQuestion()` | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Procesa respuesta y avanza |
+| `goBack()` | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Retrocede a pregunta anterior |
+| `_findNextQuestionIndex()` | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Determina siguiente pregunta |
+| `addMedication()` | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Agrega medicamento |
+| `deleteMedication()` | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Elimina medicamento |
+| `updateFamilyConditions()` | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Actualiza historial familiar |
+| `completeQuestionnaire()` | `questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/questionnaire_notifier.dart` | Finaliza cuestionario |
+
+### Cuestionarios Diarios
+| Método | Archivo | Ruta | Propósito |
+|--------|---------|------|-----------|
+| `checkAndShowActiveQuestionnaire()` | `daily_questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/daily_questionnaire_notifier.dart` | Verifica si hay que mostrar cuestionario |
+| `showQuestionnaire()` | `daily_questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/daily_questionnaire_notifier.dart` | Muestra cuestionario específico |
+| `answerQuestion()` | `daily_questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/daily_questionnaire_notifier.dart` | Procesa respuesta |
+| `closeQuestionnaire()` | `daily_questionnaire_notifier.dart` | `lib/presentation/providers/notifiers/daily_questionnaire_notifier.dart` | Cierra cuestionario |
+| `saveQuestionnaireResponse()` | `daily_questionnaire_service.dart` | `lib/data/daily_questionnaire_service.dart` | Guarda respuestas |
+| `isQuestionnaireCompletedToday()` | `daily_questionnaire_service.dart` | `lib/data/daily_questionnaire_service.dart` | Verifica si ya se completó hoy |
+
+### Notificaciones
+| Método | Archivo | Ruta | Propósito |
+|--------|---------|------|-----------|
+| `initialize()` | `notification_service.dart` | `lib/data/notification_service.dart` | Configura sistema de notificaciones |
+| `scheduleMedicationNotifications()` | `notification_service.dart` | `lib/data/notification_service.dart` | Programa notificaciones de medicamentos |
+| `schedulePostMealNotifications()` | `notification_service.dart` | `lib/data/notification_service.dart` | Programa notificaciones post-comida |
+| `scheduleDailyQuestionnaireNotification()` | `notification_service.dart` | `lib/data/notification_service.dart` | Programa cuestionarios diarios |
+| `cancelMedicationNotifications()` | `notification_service.dart` | `lib/data/notification_service.dart` | Cancela notificaciones de medicamento |
+| `activateDailyQuestionnaire()` | `notification_service.dart` | `lib/data/notification_service.dart` | Activa cuestionario al tocar notificación |
+
+### Almacenamiento
+| Método | Archivo | Ruta | Propósito |
+|--------|---------|------|-----------|
+| `saveUserProfile()` | `firestore_service.dart` | `lib/data/firestore_service.dart` | Guarda perfil en Firestore |
+| `getUserProfile()` | `firestore_service.dart` | `lib/data/firestore_service.dart` | Obtiene perfil de Firestore |
+| `markInitialQuestionnaireCompleted()` | `firestore_service.dart` | `lib/data/firestore_service.dart` | Marca cuestionario como completado |
+| `updateUserProfileFields()` | `firestore_service.dart` | `lib/data/firestore_service.dart` | Actualiza campos específicos del perfil |
+| `saveQuestionnaireData()` | `local_storage.dart` | `lib/data/local_storage.dart` | Guarda estado del cuestionario localmente |
+| `loadQuestionnaireData()` | `local_storage.dart` | `lib/data/local_storage.dart` | Carga estado del cuestionario local |
+
+## Elementos UI y Estados
+
+### Botones Principales
+| Botón | Archivo | Método/Handler | Estado Asociado |
+|-------|---------|---------------|----------------|
+| "Iniciar con Google/Apple" | `auth_screen.dart` | `_signInWithPlatform()` | `AuthStatus` en `authNotifierProvider` |
+| "Siguiente/Continuar" (Cuestionario) | `questionnaire_screen.dart` | `_buildNavigationButtons()` → `_navigateForward()` | `currentQuestionIndex` en `questionsProvider` |
+| "Anterior" (Cuestionario) | `questionnaire_screen.dart` | `_buildNavigationButtons()` → `_navigateBack()` | `currentQuestionIndex` en `questionsProvider` |
+| "Agregar Medicamento" | `medication_form.dart` | `ElevatedButton.onPressed` → `onAddMedication()` | `medications` en `questionsProvider` |
+| "Agregar Condición" | `family_history_form.dart` | `ElevatedButton.onPressed` → `onUpdate()` | `familyConditions` en `questionsProvider` |
+| "Registrar" (Digestivo) | `digestive_health_card_widget.dart` | `ElevatedButton.onPressed` | N/A (navegación) |
+| "+" (FloatingActionButton) | `dashboard_screen.dart` | `FloatingActionButton.onPressed` | N/A (navegación) |
+| Iconos Navegación | `bottom_navigation_widget.dart` | `_buildNavItem()` | N/A (navegación) |
+
+### Formularios Clave
+| Formulario | Archivo | Manejo de Datos | Validación |
+|------------|---------|-----------------|------------|
+| Datos de Usuario | `user_data_completion_screen.dart` | `updateUserProfileFields()` | Validadores integrados |
+| Medicamento | `medication_form.dart` | `onAddMedication()` | Validación de campos requeridos |
+| Historial Familiar | `family_history_form.dart` | `onUpdate()` | Validación simple |
+| Respuestas de Cuestionario | `question_widget_updated.dart` | `_buildInputField()` → Métodos específicos por tipo | Según tipo de pregunta |
+
+## Modelos de Datos (Entidades)
+
+### UserProfile
+**Archivo**: `lib/domain/entities/user_profile.dart`
+```dart
+{
+  String uid;                   // ID único del usuario
+  String displayName;           // Nombre para mostrar
+  String? email;                // Correo electrónico (opcional)
+  String? photoURL;             // URL de foto de perfil (opcional)
+  DateTime createdAt;           // Fecha de creación
+  DateTime lastLoginAt;         // Último inicio de sesión
+  bool completedInitialQuestionnaire; // ¿Completó cuestionario inicial?
+}
+```
+
+### Question
+**Archivo**: `lib/domain/entities/question.dart`
+```dart
+{
+  String id;                    // ID único de la pregunta
+  String text;                  // Texto de la pregunta
+  QuestionType type;            // Tipo (yesNo, text, select, etc.)
+  List<String>? options;        // Opciones (para select/multiSelect)
+  String? hint;                 // Texto de ayuda (opcional)
+  bool isRequired;              // ¿Es obligatoria?
+  String? parentId;             // ID de pregunta padre (para ramificación)
+  List<String>? dependsOn;      // Valores de los que depende
+}
+```
+
+### Medication
+**Archivo**: `lib/domain/entities/medication.dart`
+```dart
+{
+  String name;                  // Nombre del medicamento
+  int intervalHours;            // Intervalo en horas
+  bool isIndefinite;            // ¿Tratamiento indefinido?
+  DateTime? endDate;            // Fecha de fin (opcional)
+  DateTime nextDose;            // Próxima dosis programada
+}
+```
+
+### QuestionnaireState
+**Archivo**: `lib/domain/entities/questionnaire_state.dart`
+```dart
+{
+  int currentQuestionIndex;     // Índice de pregunta actual
+  Map<String, dynamic> answers; // Respuestas guardadas
+  bool isCompleted;             // ¿Está completado?
+  List<int> questionHistory;    // Historial de navegación
+  String? currentProtein;       // Proteína actual (para secuencias)
+  List<String> remainingProteins; // Proteínas pendientes
+  bool isLowPerformanceMode;    // Modo de rendimiento reducido
+}
+```

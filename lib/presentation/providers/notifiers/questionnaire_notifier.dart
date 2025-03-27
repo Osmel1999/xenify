@@ -18,64 +18,105 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
       : super(QuestionnaireState(currentQuestionIndex: 0));
 
   void answerQuestion(String questionId, dynamic answer) {
+    print('\n🔍 DEBUG - answerQuestion:');
+    print('📍 ID de pregunta: $questionId');
+    print('📥 Respuesta recibida: $answer');
+    print('📊 Estado inicial:');
+    print('- Índice actual: ${state.currentQuestionIndex}');
+    print('- Proteína actual: ${state.currentProtein}');
+    print('- Proteínas pendientes: ${state.remainingProteins}');
+
     // Preparar las actualizaciones básicas del estado
     final newAnswers = {...state.answers, questionId: answer};
     final newHistory = [...state.questionHistory, state.currentQuestionIndex];
 
+    print('\n🔄 Procesando respuesta:');
     // Manejar respuestas de proteínas antes de determinar la siguiente pregunta
     if (questionId == 'vegetarian_proteins' ||
         questionId == 'omnivore_proteins' ||
         questionId == 'gluten_free_proteins') {
+      print('📌 Manejando selección de proteínas');
       _handleProteinSelection(questionId, answer as List<String>, newAnswers);
     } else if (questionId == 'protein_frequency' ||
         questionId == 'gluten_free_protein_frequency') {
+      print('📌 Manejando frecuencia de proteína');
       _handleProteinFrequencyAnswer(answer, newAnswers);
+
+      // Si hay proteínas pendientes, no actualizamos el estado nuevamente
+      if (state.remainingProteins.isNotEmpty) {
+        print('⏭️ Proteínas pendientes detectadas, manteniendo estado actual');
+        _checkAndLoadMoreQuestions();
+        return;
+      }
     }
 
-    // Determinar la siguiente pregunta después de actualizar el estado de proteínas
-    int nextIndex = _findNextQuestionIndex(questionId, answer);
+    print('\n📊 Estado después de manejar respuesta:');
+    print('- Índice actual: ${state.currentQuestionIndex}');
+    print('- Proteína actual: ${state.currentProtein}');
+    print('- Proteínas pendientes: ${state.remainingProteins}');
 
+    // Determinar la siguiente pregunta después de actualizar el estado de proteínas
+    print('\n🎯 Determinando siguiente pregunta...');
+    int nextIndex = _findNextQuestionIndex(questionId, answer);
+    print('📍 Índice siguiente calculado: $nextIndex');
+
+    print('\n📦 Actualizando estado final:');
     if (nextIndex >= questionsList.length) {
+      print('✅ Cuestionario completado');
+
       final newState = state.copyWith(
         answers: newAnswers,
         isCompleted: true,
         questionHistory: newHistory,
       );
+
+      print('📊 Estado final:');
+      print('- Respuestas guardadas: ${newState.answers.keys}');
+      print('- Historia guardada: ${newState.questionHistory}');
+
       state = newState;
-
-      // Guardar datos cuando se completa el cuestionario
       LocalStorage.saveQuestionnaireData(newState);
-
-      // Manejar respuestas relacionadas con los horarios de las comidas
       _handleMealTimeAnswers();
     } else {
-      // Actualizar el estado con el texto de la próxima pregunta
+      print('\n🔄 Preparando siguiente pregunta');
       final nextQuestion = questionsList[nextIndex];
       String? nextQuestionText;
 
+      print('📝 Estado antes de actualización:');
+      print('- Proteína actual: ${state.currentProtein}');
+      print('- Proteínas pendientes: ${state.remainingProteins}');
+      print('- Índice actual: ${state.currentQuestionIndex}');
+
       if (_isProteinFrequencyQuestion(nextQuestion.id)) {
-        // Para preguntas de frecuencia de proteína
+        print('🔍 Configurando pregunta de frecuencia de proteína');
         if (state.currentProtein != null) {
           nextQuestionText = nextQuestion.text
               .replaceAll('%protein%', state.currentProtein!.toLowerCase());
-          print(
-              '🔄 Actualizando pregunta para proteína: ${state.currentProtein}');
+          print('✏️ Texto personalizado: $nextQuestionText');
         } else {
           print('⚠️ No hay proteína actual, usando texto original');
           nextQuestionText = nextQuestion.text;
         }
       } else {
-        // Para otras preguntas, usar el texto original
         nextQuestionText = nextQuestion.text;
-        print('➡️ Avanzando a pregunta: ${nextQuestion.id}');
+        print('➡️ Siguiente pregunta: ${nextQuestion.id}');
       }
 
-      state = state.copyWith(
+      // Preparar nuevo estado
+      final newState = state.copyWith(
         answers: newAnswers,
         currentQuestionIndex: nextIndex,
         questionHistory: newHistory,
         currentQuestionText: nextQuestionText,
       );
+
+      print('\n📊 Verificación de estado final:');
+      print('- Nuevo índice: ${newState.currentQuestionIndex}');
+      print('- Nueva proteína: ${newState.currentProtein}');
+      print('- Proteínas pendientes: ${newState.remainingProteins}');
+      print('- Nuevo texto: ${newState.currentQuestionText}');
+
+      state = newState;
     }
 
     // Verificar si necesitamos cargar más preguntas
@@ -208,15 +249,23 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
         '📍 Retrocediendo a pregunta: ${previousQuestion.id} (índice: $previousIndex)');
     print('📝 Texto actual: ${state.currentQuestionText}');
 
-    // Obtener las proteínas seleccionadas según el tipo de dieta
+    // Obtener las proteínas seleccionadas y sus frecuencias según el tipo de dieta
     List<String>? selectedProteins;
+    String proteinKey = '';
+
+    // Identificar el tipo de proteínas y obtener la lista correcta
     if (state.answers.containsKey('vegetarian_proteins')) {
       selectedProteins = state.answers['vegetarian_proteins'] as List<String>?;
+      proteinKey = 'vegetarian_proteins';
     } else if (state.answers.containsKey('omnivore_proteins')) {
       selectedProteins = state.answers['omnivore_proteins'] as List<String>?;
+      proteinKey = 'omnivore_proteins';
     } else if (state.answers.containsKey('gluten_free_proteins')) {
       selectedProteins = state.answers['gluten_free_proteins'] as List<String>?;
+      proteinKey = 'gluten_free_proteins';
     }
+
+    print('🥩 Proteínas seleccionadas recuperadas: $selectedProteins');
 
     // Restaurar el estado de proteínas si es necesario
     if (_isProteinFrequencyQuestion(previousQuestion.id) &&
@@ -226,23 +275,45 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
               as List<Map<String, String>>?) ??
           [];
 
-      // Filtrar las proteínas que ya tienen frecuencia registrada
-      final proteinsWithFrequency =
-          frequencies.map((f) => f['protein'] as String).toList();
-      final remainingProteins = selectedProteins
-          .where((p) => !proteinsWithFrequency.contains(p))
-          .toList();
+      print('📊 Frecuencias registradas: $frequencies');
 
-      // Si hay proteínas pendientes, establecer la siguiente
+      // Reconstruir el orden original de las proteínas
+      final orderedProteins = List<String>.from(selectedProteins);
+
+      // Encontrar la última proteína procesada
+      String? lastProcessedProtein;
+      if (frequencies.isNotEmpty) {
+        lastProcessedProtein = frequencies.last['protein'];
+        print('🔄 Última proteína procesada: $lastProcessedProtein');
+      }
+
+      // Encontrar el índice de la última proteína procesada
+      int lastIndex = lastProcessedProtein != null
+          ? orderedProteins.indexOf(lastProcessedProtein)
+          : -1;
+
+      // Calcular las proteínas restantes manteniendo el orden original
+      final remainingProteins = lastIndex >= 0
+          ? orderedProteins.sublist(0, lastIndex + 1)
+          : orderedProteins;
+
+      print('📝 Proteínas restantes en orden: $remainingProteins');
+
       if (remainingProteins.isNotEmpty) {
+        final currentProtein = remainingProteins.last;
+        final previousProteins =
+            remainingProteins.sublist(0, remainingProteins.length - 1);
+
         state = state.copyWith(
           currentQuestionIndex: previousIndex < 0 ? 0 : previousIndex,
           questionHistory: newHistory,
-          currentProtein: remainingProteins.first,
-          remainingProteins: remainingProteins.skip(1).toList(),
+          currentProtein: currentProtein,
+          remainingProteins: previousProteins,
           currentQuestionText: previousQuestion.text
-              .replaceAll('%protein%', remainingProteins.first.toLowerCase()),
+              .replaceAll('%protein%', currentProtein.toLowerCase()),
         );
+        print('✅ Estado restaurado para proteína: $currentProtein');
+        print('⏳ Proteínas anteriores pendientes: $previousProteins');
         return;
       }
     }
@@ -283,28 +354,64 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     if (selectedProteins.isEmpty) return;
 
     try {
-      // Determinar el ID correcto de la pregunta de frecuencia
+      print('\n🔍 DEBUG - _handleProteinSelection:');
+      print('📍 ID de pregunta actual: $questionId');
+      print('📋 Proteínas seleccionadas: $selectedProteins');
+
+      // Identificar el tipo de pregunta de frecuencia
       String frequencyQuestionId = questionId == 'gluten_free_proteins'
           ? 'gluten_free_protein_frequency'
           : 'protein_frequency';
 
-      // Encontrar la pregunta de frecuencia
-      final frequencyQuestion = questionsList.firstWhere(
-        (q) => q.id == frequencyQuestionId,
-      );
+      print('🎯 ID de pregunta de frecuencia objetivo: $frequencyQuestionId');
 
-      // Actualizar el estado con la primera proteína y las restantes
-      state = state.copyWith(
+      // Encontrar la pregunta de frecuencia y su índice
+      final frequencyIndex =
+          questionsList.indexWhere((q) => q.id == frequencyQuestionId);
+      final frequencyQuestion = questionsList[frequencyIndex];
+
+      print('📊 Índice de pregunta de frecuencia: $frequencyIndex');
+      print('❓ Pregunta encontrada: ${frequencyQuestion.text}');
+
+      print('\n🔄 DEBUG - Preparando estado inicial:');
+
+      // Preparar estado inicial limpio
+      final updatedAnswers = {
+        ...answers,
+        'all_selected_proteins': selectedProteins,
+        'protein_frequencies': <Map<String, String>>[],
+        'current_question_index': frequencyIndex,
+      };
+
+      print('📦 Estado actual antes de actualizar:');
+      print('- Índice actual: ${state.currentQuestionIndex}');
+      print('- Proteína actual: ${state.currentProtein}');
+      print('- Proteínas pendientes: ${state.remainingProteins}');
+      print('- Texto actual: ${state.currentQuestionText}');
+
+      // Configurar estado inicial con índice correcto
+      final newState = state.copyWith(
+        currentQuestionIndex: frequencyIndex,
         currentProtein: selectedProteins.first,
         remainingProteins: selectedProteins.skip(1).toList(),
         currentQuestionText: frequencyQuestion.text
             .replaceAll('%protein%', selectedProteins.first.toLowerCase()),
-        // Inicializar o limpiar las frecuencias anteriores
-        answers: {
-          ...answers,
-          'protein_frequencies': <Map<String, String>>[],
-        },
+        answers: updatedAnswers,
       );
+
+      print('\n📦 Estado nuevo preparado:');
+      print('- Índice nuevo: ${newState.currentQuestionIndex}');
+      print('- Nueva proteína: ${newState.currentProtein}');
+      print('- Nuevas proteínas pendientes: ${newState.remainingProteins}');
+      print('- Nuevo texto: ${newState.currentQuestionText}');
+
+      state = newState;
+
+      print('\n✅ Estado actualizado correctamente');
+      print('🔍 Verificación post-actualización:');
+      print('- Índice actual: ${state.currentQuestionIndex}');
+      print('- Proteína actual: ${state.currentProtein}');
+      print('- Proteínas pendientes: ${state.remainingProteins}');
     } catch (e) {
       print('Error en _handleProteinSelection: $e');
       state = state.copyWith(
@@ -318,18 +425,28 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
   // Maneja la respuesta de frecuencia de proteína
   void _handleProteinFrequencyAnswer(
       dynamic answer, Map<String, dynamic> answers) {
+    print('\n🔍 DEBUG - _handleProteinFrequencyAnswer:');
+    print('📥 Respuesta recibida: $answer');
+    print('📊 Estado actual:');
+    print('- Proteína actual: ${state.currentProtein}');
+    print('- Proteínas pendientes: ${state.remainingProteins}');
+
     if (state.currentProtein == null) {
-      print('❌ No hay proteína actual, finalizando secuencia');
+      print('❌ Error: No hay proteína actual, finalizando secuencia');
       _finishProteinFrequencies(answers);
       return;
     }
 
     try {
+      print('🔄 Procesando respuesta de frecuencia...');
+
       // Preparar y validar la respuesta
       final frequency =
           answer is Map ? answer['frequency'] as String : answer as String;
+      print('📝 Frecuencia extraída: $frequency');
+
       if (frequency.isEmpty) {
-        print('❌ Frecuencia inválida');
+        print('❌ Error: Frecuencia inválida (vacía)');
         return;
       }
 
@@ -341,34 +458,79 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
         'timestamp': DateTime.now().toIso8601String(),
       };
 
-      // Actualizar la lista de frecuencias
+      // Obtener las frecuencias existentes
       final currentFrequencies =
           (answers['protein_frequencies'] as List<dynamic>?)
                   ?.whereType<Map<String, String>>()
                   .toList() ??
               [];
 
+      // Actualizar con la nueva frecuencia
       final updatedFrequencies =
           List<Map<String, String>>.from(currentFrequencies);
       final existingIndex = updatedFrequencies
           .indexWhere((f) => f['protein'] == state.currentProtein);
 
       if (existingIndex >= 0) {
-        updatedFrequencies[existingIndex] = proteinFrequency;
+        updatedFrequencies[existingIndex] =
+            proteinFrequency as Map<String, String>;
       } else {
-        updatedFrequencies.add(proteinFrequency);
+        updatedFrequencies.add(proteinFrequency as Map<String, String>);
       }
 
-      // Actualizar el estado con la nueva frecuencia
       answers['protein_frequencies'] = updatedFrequencies;
 
-      if (state.remainingProteins.isEmpty) {
-        print('✅ Todas las proteínas procesadas');
+      // Verificar si hay más proteínas pendientes
+      if (state.remainingProteins.isNotEmpty) {
+        // Si hay más proteínas, preparar la siguiente sin avanzar a otra pregunta
+        print(
+            '⏭️ Todavía hay proteínas pendientes: ${state.remainingProteins.length}');
+
+        // Obtener el índice actual de la pregunta de frecuencia
+        final frequencyQuestionId = answers.containsKey('gluten_free_proteins')
+            ? 'gluten_free_protein_frequency'
+            : 'protein_frequency';
+
+        final frequencyQuestionIndex =
+            questionsList.indexWhere((q) => q.id == frequencyQuestionId);
+
+        // Actualizar el estado para mostrar la siguiente proteína pero manteniendo la misma pregunta
+        final nextProtein = state.remainingProteins.first;
+
+        final newState = state.copyWith(
+          currentQuestionIndex: frequencyQuestionIndex,
+          currentProtein: nextProtein,
+          remainingProteins: state.remainingProteins.skip(1).toList(),
+          currentQuestionText: questionsList[frequencyQuestionIndex]
+              .text
+              .replaceAll('%protein%', nextProtein.toLowerCase()),
+        );
+
+        // Actualizar el estado preservando la proteína actual
+        state = newState.copyWith(
+          answers: {...answers},
+        );
+
+        print('⏭️ Preparada siguiente proteína: $nextProtein');
+        // No llamamos a answerQuestion aquí, solo actualizamos el estado
+      } else {
+        // Si no hay más proteínas, podemos finalizar la secuencia
+        print('✅ No hay más proteínas pendientes, finalizando secuencia');
         answers['current_protein_completed'] = true;
         _finishProteinFrequencies(answers);
-      } else {
-        print('⏭️ Preparando siguiente proteína');
-        _prepareNextProtein(answers);
+
+        // Aquí es donde avanzamos a la siguiente pregunta
+        final nextQuestionIndex =
+            questionsList.indexWhere((q) => q.id == 'vegetables');
+        if (nextQuestionIndex >= 0) {
+          state = state.copyWith(
+            currentQuestionIndex: nextQuestionIndex,
+            currentProtein: null,
+            remainingProteins: const [],
+            currentQuestionText: questionsList[nextQuestionIndex].text,
+            answers: answers,
+          );
+        }
       }
     } catch (e) {
       print('❌ Error procesando frecuencia: $e');
@@ -378,44 +540,60 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
 
   /// Prepara el estado para la siguiente proteína o finaliza el proceso
   void _prepareNextProtein(Map<String, dynamic> answers) {
-    if (state.remainingProteins.isEmpty) {
-      print('✅ No hay más proteínas, finalizando proceso');
-      answers['current_protein_completed'] = true;
-      _finishProteinFrequencies(answers);
-      return;
-    }
+    print('🔄 Iniciando preparación de siguiente proteína');
 
     try {
-      // Obtener la siguiente proteína y su pregunta correspondiente
-      final nextProtein = state.remainingProteins.first;
-      final currentQuestionId = state.currentQuestionIndex >= 0 &&
-              state.currentQuestionIndex < questionsList.length
-          ? questionsList[state.currentQuestionIndex].id
-          : null;
+      // Mantener el índice de la pregunta actual
+      final currentIndex = state.currentQuestionIndex;
+      print('📍 Índice actual: $currentIndex');
 
-      // Encontrar la pregunta correcta para la siguiente proteína
-      final frequencyQuestion = questionsList.firstWhere(
-        (q) => q.id == currentQuestionId,
-        orElse: () => questionsList.firstWhere((q) =>
-            q.id ==
-            (answers.containsKey('gluten_free_proteins')
-                ? 'gluten_free_protein_frequency'
-                : 'protein_frequency')),
-      );
+      // Obtener todas las proteínas y calcular pendientes
+      final allProteins = answers['all_selected_proteins'] as List<String>;
+      final frequencies =
+          answers['protein_frequencies'] as List<Map<String, String>>? ?? [];
+      final processedProteins =
+          frequencies.map((f) => f['protein'] as String).toList();
+      final pendingProteins =
+          allProteins.where((p) => !processedProteins.contains(p)).toList();
 
-      // Actualizar el estado con la nueva proteína
-      answers['current_protein_completed'] = false;
+      print('📊 Estado de proteínas:');
+      print(
+          '✅ Procesadas: ${processedProteins.length} de ${allProteins.length}');
+      print('⏳ Pendientes: ${pendingProteins.length}');
+
+      // Verificar si quedan proteínas por procesar
+      if (pendingProteins.isEmpty) {
+        print('✅ Todas las proteínas procesadas');
+        answers['current_protein_completed'] = true;
+        _finishProteinFrequencies(answers);
+        return;
+      }
+
+      // Preparar la siguiente proteína
+      final nextProtein = pendingProteins.first;
+      print('⏭️ Siguiente proteína: $nextProtein');
+
+      // Actualizar el estado manteniendo el índice actual
+      final updatedAnswers = {
+        ...answers,
+        'current_protein': nextProtein,
+        'remaining_proteins': pendingProteins.skip(1).toList(),
+        'current_protein_index': processedProteins.length,
+      };
+
       state = state.copyWith(
+        currentQuestionIndex: currentIndex, // Mantener el índice actual
         currentProtein: nextProtein,
-        remainingProteins: state.remainingProteins.skip(1).toList(),
-        currentQuestionText: frequencyQuestion.text
+        remainingProteins: pendingProteins.skip(1).toList(),
+        currentQuestionText: questionsList[currentIndex]
+            .text
             .replaceAll('%protein%', nextProtein.toLowerCase()),
-        answers: answers,
+        answers: updatedAnswers,
       );
 
-      print('✅ Preparada siguiente proteína: $nextProtein');
+      print('✅ Estado actualizado correctamente');
     } catch (e) {
-      print('❌ Error preparando siguiente proteína: $e');
+      print('❌ Error: $e');
       _finishProteinFrequencies(answers);
     }
   }
@@ -686,20 +864,56 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
       return questionsList.indexWhere((q) => q.id == 'vegetables');
     }
 
-    // Manejar preguntas de frecuencia de proteína
+    // Manejo especial para preguntas de frecuencia de proteína
     if (currentQuestionId == 'protein_frequency' ||
         currentQuestionId == 'gluten_free_protein_frequency') {
-      // Si no hay más proteínas pendientes o ya se completó, avanzar a verduras
-      if (state.remainingProteins.isEmpty ||
-          (state.answers['current_protein_completed'] as bool? ?? false)) {
-        print('✅ Avanzando a sección de verduras');
-        return questionsList.indexWhere((q) => q.id == 'vegetables');
+      print('\n🔍 DEBUG - _findNextQuestionIndex para frecuencia de proteína:');
+      print('📍 ID de pregunta actual: $currentQuestionId');
+      print('📋 Respuesta recibida: $answer');
+
+      // Obtener el índice de la pregunta de frecuencia actual
+      final frequencyQuestionId = currentQuestionId;
+      final frequencyQuestionIndex =
+          questionsList.indexWhere((q) => q.id == frequencyQuestionId);
+
+      print('📊 Estado actual de proteínas:');
+      print('- Proteína actual: ${state.currentProtein}');
+      print('- Proteínas pendientes: ${state.remainingProteins}');
+      print('- Índice de pregunta de frecuencia: $frequencyQuestionIndex');
+
+      print('🔍 Verificando estado de proteínas:');
+
+      // Verificar si la proteína actual ya fue procesada
+      List<Map<String, String>> frequencies =
+          (state.answers['protein_frequencies'] as List<dynamic>?)
+                  ?.cast<Map<String, String>>() ??
+              [];
+
+      bool currentProteinProcessed = false;
+      if (state.currentProtein != null && frequencies.isNotEmpty) {
+        currentProteinProcessed = frequencies.any((f) =>
+            f['protein'] == state.currentProtein && f['frequency'] != null);
       }
 
-      // Si aún hay proteínas por procesar, mantener en la misma pregunta
-      print(
-          '⏳ Continuando con siguiente proteína: ${state.remainingProteins.first}');
-      return currentIndex;
+      print('- Proteína actual: ${state.currentProtein}');
+      print('- Frecuencias registradas: ${frequencies.length}');
+      print('- Proteína actual procesada: $currentProteinProcessed');
+      print('- Proteínas pendientes: ${state.remainingProteins}');
+
+      // Si la proteína actual ya fue procesada y no hay más pendientes
+      if (currentProteinProcessed && state.remainingProteins.isEmpty) {
+        print('✅ Avanzando a verduras:');
+        print('- Razón: Última proteína procesada y no hay más pendientes');
+        final vegetablesIndex =
+            questionsList.indexWhere((q) => q.id == 'vegetables');
+        print('- Índice de pregunta de verduras: $vegetablesIndex');
+        return vegetablesIndex;
+      }
+
+      // Si hay más proteínas pendientes o la actual no está procesada
+      print('⏳ Manteniendo en pregunta de frecuencia:');
+      print('- Razón: Proteína actual no procesada o quedan pendientes');
+      return frequencyQuestionIndex;
     }
 
     // Si no es una pregunta especial, avanzar a la siguiente

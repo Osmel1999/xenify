@@ -1,0 +1,254 @@
+# Documentación de Xenify - Flujo de Información y Métodos
+
+## Índice
+1. [Introducción](#introducción)
+2. [Arquitectura General](#arquitectura-general)
+3. [Flujo de Autenticación](#flujo-de-autenticación)
+4. [Flujo de Cuestionarios](#flujo-de-cuestionarios)
+5. [Sistema de Notificaciones](#sistema-de-notificaciones)
+6. [Flujo del Dashboard](#flujo-del-dashboard)
+7. [Almacenamiento de Datos](#almacenamiento-de-datos)
+8. [Seguimiento Diario](#seguimiento-diario)
+9. [Referencias de Clases y Métodos](#referencias-de-clases-y-métodos)
+
+## Introducción
+
+Xenify es una aplicación de salud integral con enfoque holístico para dos tipos de usuarios:
+- **Usuarios Patológicos (P)**: Personas con condiciones médicas diagnosticadas
+- **Usuarios Saludables (S)**: Personas que buscan mejorar su estilo de vida
+
+Esta documentación explica el flujo de información y los métodos principales para facilitar el mantenimiento y desarrollo.
+
+## Arquitectura General
+
+La aplicación sigue una arquitectura basada en capas:
+
+```
+lib/
+├── data/            # Capa de datos y servicios
+├── domain/          # Entidades y lógica de negocio
+├── presentation/    # UI, providers y gestión de estado
+```
+
+### Gestión de Estado
+- Usa Riverpod como gestor de estado principal
+- Los providers se organizan por funcionalidad (auth, questionnaire, etc.)
+- Los notifiers implementan la lógica de actualización de estado
+
+## Flujo de Autenticación
+
+### Inicio de la Aplicación
+1. `main.dart` inicializa Firebase y los servicios de notificaciones
+2. `MyApp` evalúa el estado de autenticación con `authStateProvider`
+3. Si no hay usuario autenticado → `AuthScreen`
+4. Si hay usuario autenticado → verifica perfil y redirige
+
+### Proceso de Autenticación
+1. Usuario selecciona método de login en `AuthScreen`
+2. `AuthService.signInWithPlatform()` detecta plataforma y autentica con Google o Apple
+3. Recibe `UserCredential` de Firebase Auth
+4. Verifica si el usuario es nuevo
+5. Guarda o actualiza perfil en Firestore con `FirestoreService`
+6. Actualiza estado en `authNotifierProvider`
+
+### Métodos Clave de Autenticación:
+- `AuthService.signInWithPlatform()`: Inicia autenticación según plataforma
+- `AuthService.signInWithGoogle()`: Maneja autenticación con Google
+- `AuthService.signInWithApple()`: Maneja autenticación con Apple
+- `AuthService._handleUserAuthentication()`: Procesa resultados de la autenticación
+- `AuthNotifier.signInWithPlatform()`: Actualiza estado global tras autenticación
+- `AuthNotifier.signOut()`: Cierra sesión del usuario
+
+### Flujo Post-Autenticación:
+1. Si user.completedInitialQuestionnaire == false → `QuestionnaireScreen`
+2. Si profileRequiresCompletion == true → `UserDataCompletionScreen` 
+3. Si todo está completo → `DashboardScreen`
+
+## Flujo de Cuestionarios
+
+### Cuestionario Inicial
+1. Usuario ingresa a `QuestionnaireScreen`
+2. `questionsProvider` gestiona el estado global del cuestionario
+3. `QuestionnaireNotifier` maneja la lógica de navegación y respuestas
+4. Las preguntas son adaptativas usando branching con `dependsOn` y `parentId`
+
+### Proceso de Respuesta:
+1. Usuario responde en `QuestionWidgetUpdated`
+2. `questionsProvider.notifier.answerQuestion(id, answer)` guarda la respuesta
+3. Se determina la siguiente pregunta con `_findNextQuestionIndex`
+4. Para preguntas con ramificación (ej. proteínas) se usa lógica especial
+5. Al completar, se actualiza Firestore con `markInitialQuestionnaireCompleted()`
+
+### Cuestionarios Diarios:
+1. `DailyQuestionnaireChecker` verifica si hay que mostrar un cuestionario
+2. `dailyQuestionnaireStateProvider` gestiona el estado
+3. Las respuestas se guardan con `DailyQuestionnaireService`
+4. Notificaciones programadas activan cuestionarios en momentos específicos
+
+### Métodos Clave de Cuestionarios:
+- `QuestionnaireNotifier.answerQuestion()`: Procesa respuesta y avanza
+- `QuestionnaireNotifier._findNextQuestionIndex()`: Determina la siguiente pregunta
+- `QuestionnaireNotifier.goBack()`: Retrocede a la pregunta anterior
+- `DailyQuestionnaireNotifier.checkAndShowActiveQuestionnaire()`: Verifica cuestionarios pendientes
+- `DailyQuestionnaireNotifier.showQuestionnaire()`: Activa un cuestionario específico
+- `DailyQuestionnaireService.saveQuestionnaireResponse()`: Almacena respuestas
+
+## Sistema de Notificaciones
+
+### Inicialización
+1. `NotificationService.initialize()` configura canales y solicita permisos
+2. Establece manejadores para interacciones con notificaciones
+
+### Tipos de Notificaciones:
+1. **Medicamentos**: Recordatorios basados en horarios e intervalos
+2. **Post-Comidas**: Recordatorios después de horarios de alimentación
+3. **Cuestionarios Diarios**: Programados para diferentes momentos del día
+
+### Programación de Notificaciones:
+1. `scheduleMedicationNotifications()`: Programa recordatorios de medicamentos
+2. `schedulePostMealNotifications()`: Programa recordatorios post-comida
+3. `scheduleDailyQuestionnaireNotification()`: Programa notificaciones de cuestionarios
+
+### Interacción con Notificaciones:
+1. Usuario recibe notificación
+2. Al tocar, se ejecuta el callback `onDidReceiveNotificationResponse`
+3. Para cuestionarios, se activa `activateDailyQuestionnaire()`
+
+### Métodos Clave de Notificaciones:
+- `NotificationService.initialize()`: Configura el sistema de notificaciones
+- `NotificationService.scheduleMedicationNotifications()`: Programa recordatorios de medicamentos
+- `NotificationService.schedulePostMealNotifications()`: Programa recordatorios post-comida
+- `NotificationService.scheduleDailyQuestionnaireNotification()`: Programa notificaciones de cuestionarios
+- `NotificationService.cancelMedicationNotifications()`: Cancela notificaciones de un medicamento
+
+## Flujo del Dashboard
+
+### Inicialización del Dashboard
+1. `DashboardScreen` carga al completar el onboarding
+2. Contiene múltiples widgets tipo "card" para diferentes métricas
+
+### Componentes Principales:
+1. `HeaderWidget`: Muestra información del usuario y métricas rápidas
+2. `WellbeingCardWidget`: Muestra diagnósticos y síntomas
+3. `MetricsRowWidget`: Visualiza nutrición y actividad
+4. `HydrationCardWidget`: Seguimiento de hidratación
+5. `MealTrackingCardWidget`: Seguimiento alimenticio
+6. `DigestiveHealthCardWidget`: Salud digestiva
+7. `MedicationReminderCardWidget`: Próximas medicaciones
+
+### Flujo de Actualización:
+- Cada widget se conecta a su propio provider
+- Al registrar nueva información, se actualizan los providers correspondientes
+- Los widgets se reconstruyen automáticamente con la nueva información
+
+## Almacenamiento de Datos
+
+### Tipos de Almacenamiento:
+1. **Firestore**: Para datos de usuario (perfil, completado de cuestionarios)
+2. **SharedPreferences**: Para datos locales (respuestas de cuestionarios diarios)
+
+### Flujo de Datos:
+1. `FirestoreService` gestiona operaciones con Firestore
+2. `LocalStorage` maneja datos en SharedPreferences
+3. `DailyQuestionnaireService` guarda respuestas de cuestionarios
+
+### Métodos Clave de Almacenamiento:
+- `FirestoreService.saveUserProfile()`: Guarda perfil en Firestore
+- `FirestoreService.getUserProfile()`: Recupera perfil de Firestore
+- `FirestoreService.markInitialQuestionnaireCompleted()`: Actualiza estado del cuestionario
+- `LocalStorage.saveQuestionnaireData()`: Guarda estado del cuestionario localmente
+- `DailyQuestionnaireService.saveQuestionnaireResponse()`: Guarda respuestas diarias
+
+## Seguimiento Diario
+
+### Tipos de Seguimiento:
+1. **Estado de Ánimo**: Mañana, tarde, noche
+2. **Alimentación**: Desayuno, almuerzo, cena
+3. **Hidratación**: Registro de agua
+4. **Digestivo**: Movimientos intestinales
+5. **Medicamentos**: Cumplimiento de horarios
+
+### Flujo de Registro:
+1. Usuario accede a la sección correspondiente desde el dashboard
+2. Completa formulario de registro (ej. comida, síntomas)
+3. Los datos se guardan mediante el provider correspondiente
+4. Se actualiza la visualización en el dashboard
+
+## Referencias de Clases y Métodos
+
+### Clase: AuthService
+Maneja la autenticación con Firebase y plataformas externas
+
+| Método | Descripción |
+|--------|-------------|
+| `signInWithPlatform()` | Inicia autenticación según plataforma (Android/iOS) |
+| `signInWithGoogle()` | Maneja flujo de autenticación con Google |
+| `signInWithApple()` | Maneja flujo de autenticación con Apple |
+| `signOut()` | Cierra la sesión del usuario |
+| `profileRequiresCompletion()` | Verifica si el perfil necesita datos adicionales |
+| `_handleUserAuthentication()` | Procesa resultados de autenticación y crea/actualiza perfil |
+
+### Clase: FirestoreService
+Gestiona operaciones con la base de datos Firestore
+
+| Método | Descripción |
+|--------|-------------|
+| `saveUserProfile()` | Guarda el perfil de usuario en Firestore |
+| `getUserProfile()` | Recupera el perfil de usuario desde Firestore |
+| `updateUserLastLogin()` | Actualiza la fecha de último inicio de sesión |
+| `markInitialQuestionnaireCompleted()` | Marca como completado el cuestionario inicial |
+| `updateUserProfileFields()` | Actualiza campos específicos del perfil |
+
+### Clase: QuestionnaireNotifier
+Gestiona el estado y lógica de los cuestionarios
+
+| Método | Descripción |
+|--------|-------------|
+| `answerQuestion()` | Procesa una respuesta y determina la siguiente pregunta |
+| `goBack()` | Retrocede a la pregunta anterior |
+| `addMedication()` | Agrega un medicamento a la lista |
+| `deleteMedication()` | Elimina un medicamento de la lista |
+| `updateFamilyConditions()` | Actualiza las condiciones familiares |
+| `updateLocation()` | Actualiza la ubicación del usuario |
+| `completeQuestionnaire()` | Marca el cuestionario como completado |
+| `_findNextQuestionIndex()` | Determina el índice de la siguiente pregunta |
+
+### Clase: NotificationService
+Gestiona el sistema de notificaciones locales
+
+| Método | Descripción |
+|--------|-------------|
+| `initialize()` | Configura el sistema de notificaciones |
+| `scheduleMedicationNotifications()` | Programa notificaciones para medicamentos |
+| `schedulePostMealNotifications()` | Programa notificaciones post-comida |
+| `scheduleDailyQuestionnaireNotification()` | Programa notificación para cuestionario diario |
+| `cancelMedicationNotifications()` | Cancela notificaciones de un medicamento |
+| `cancelAllNotifications()` | Cancela todas las notificaciones |
+| `activateDailyQuestionnaire()` | Activa un cuestionario diario específico |
+
+### Clase: DailyQuestionnaireNotifier
+Gestiona los cuestionarios diarios
+
+| Método | Descripción |
+|--------|-------------|
+| `checkAndShowActiveQuestionnaire()` | Verifica si hay cuestionarios pendientes |
+| `showQuestionnaire()` | Muestra un cuestionario específico |
+| `answerQuestion()` | Procesa una respuesta de cuestionario diario |
+| `closeQuestionnaire()` | Cierra el cuestionario actual |
+
+### Clase: DailyQuestionnaireService
+Gestiona el almacenamiento de respuestas de cuestionarios diarios
+
+| Método | Descripción |
+|--------|-------------|
+| `isQuestionnaireCompletedToday()` | Verifica si un cuestionario se completó hoy |
+| `saveQuestionnaireResponse()` | Guarda las respuestas de un cuestionario |
+| `getQuestionnaireResponses()` | Recupera respuestas de cuestionarios |
+
+### Clase: LocalStorage
+Gestiona el almacenamiento local
+
+| Método | Descripción |
+|--------|-------------|
+| `saveQuestionnaireData()` | Guarda datos del cuestionario localmente |
+| `loadQuestionnaireData()` | Carga datos del cuestionario desde almacenamiento local |
