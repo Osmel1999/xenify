@@ -157,74 +157,87 @@ class _QuestionnaireNavigationState
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Botón de retroceso (solo visible si no es la primera pregunta)
-          if (!isFirstQuestion)
-            OutlinedButton.icon(
-              onPressed: () => _handleNavigation(NavigationDirection.backward),
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Anterior'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: categoryColor,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                side: BorderSide(color: categoryColor),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+      child: Center(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Botón de retroceso (solo visible si no es la primera pregunta)
+            if (!isFirstQuestion) ...[
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _handleNavigation(NavigationDirection.backward),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Anterior'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: categoryColor,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  side: BorderSide(color: categoryColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
-            )
-          else
-            const SizedBox(
-                width: 48), // Espaciador si estamos en la primera pregunta
+              const SizedBox(width: 16),
+            ],
 
-          // Indicadores de progreso
-          _buildProgressIndicators(categoryColor),
+            // Indicadores de progreso
+            _buildProgressIndicators(categoryColor),
 
-          // Botón de siguiente/finalizar
-          ElevatedButton.icon(
-            onPressed: widget.hasResponse
-                ? () => _handleNavigation(NavigationDirection.forward)
-                : null,
-            icon: Icon(isLastQuestion ? Icons.check : Icons.arrow_forward),
-            label: Text(isLastQuestion ? 'Finalizar' : 'Continuar'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: categoryColor,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: Colors.grey[300],
-              disabledForegroundColor: Colors.grey[500],
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+            const SizedBox(width: 16),
+
+            // Botón de siguiente/finalizar
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: ElevatedButton.icon(
+                onPressed: widget.hasResponse
+                    ? () => _handleNavigation(NavigationDirection.forward)
+                    : null,
+                icon: Icon(isLastQuestion ? Icons.check : Icons.arrow_forward),
+                label: Text(isLastQuestion ? 'Finalizar' : 'Continuar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: categoryColor,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey[300],
+                  disabledForegroundColor: Colors.grey[500],
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   /// Construye los indicadores de progreso (puntos)
   Widget _buildProgressIndicators(Color categoryColor) {
-    return Row(
-      children: [
-        // Botón de saltar pregunta
-        TextButton(
-          onPressed: () => _handleNavigation(
-            NavigationDirection.forward,
-            skipQuestion: true,
-          ),
-          child: Text(
-            'Saltar',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Botón de saltar pregunta
+          TextButton(
+            onPressed: () => _handleNavigation(
+              NavigationDirection.forward,
+              skipQuestion: true,
+            ),
+            child: Text(
+              'Saltar',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

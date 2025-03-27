@@ -807,6 +807,14 @@ class _CheckmarkDrawAnimationState extends State<CheckmarkDrawAnimation>
   }
 
   @override
+  void didUpdateWidget(CheckmarkDrawAnimation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reiniciar la animación en cada actualización (incluyendo hot reload)
+    _controller.reset();
+    _controller.forward();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       width: widget.size,
@@ -820,8 +828,8 @@ class _CheckmarkDrawAnimationState extends State<CheckmarkDrawAnimation>
           animation: _animation,
           builder: (context, child) {
             return CustomPaint(
-              size: Size(widget.size * 0.7,
-                  widget.size * 0.7), // Ajustar tamaño del checkmark
+              size: Size(widget.size * 0.3,
+                  widget.size * 0.3), // Ajustar tamaño del checkmark
               painter: _CheckmarkPainter(
                 color: widget.color,
                 progress: _animation.value,
@@ -849,16 +857,15 @@ class _CheckmarkPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.0
+      ..strokeWidth = 8.0
       ..strokeCap = StrokeCap.round;
 
     final path = Path();
 
-    // Reposicionamos los puntos del check mark para centrarlo mejor
-    // y asegurar que está dentro del círculo
-    final startPoint = Offset(size.width * 0.3, size.height * 0.55);
-    final midPoint = Offset(size.width * 0.45, size.height * 0.7);
-    final endPoint = Offset(size.width * 0.7, size.height * 0.4);
+    // Reposicionamos los puntos del check mark para un trazo más suave
+    final startPoint = Offset(size.width * 0.55, size.height * 0.55);
+    final midPoint = Offset(size.width * 0.45, size.height * 0.6);
+    final endPoint = Offset(size.width * 0.8, size.height * 0.35);
 
     // Calcular la longitud total del trazo
     final totalLength =

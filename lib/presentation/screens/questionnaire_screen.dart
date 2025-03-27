@@ -18,12 +18,10 @@ class QuestionnaireScreen extends ConsumerStatefulWidget {
 }
 
 class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
-  // Controlador para las animaciones del cuestionario
-  final _animationController = QuestionAnimationController.fromTheme();
-
-  // Dirección de la última transición
+  // Variables de estado
   QuestionTransitionDirection _lastTransitionDirection =
       QuestionTransitionDirection.fade;
+  int _checkmarkCounter = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +100,9 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
     );
   }
 
+  // Controlador de animación para las transiciones
+  final _animationController = QuestionAnimationController();
+
   // Pantalla de cuestionario completado
   Widget _buildCompletionScreen(BuildContext context) {
     return Center(
@@ -115,10 +116,11 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
               color: Colors.green[50],
               shape: BoxShape.circle,
             ),
-            child: const CheckmarkDrawAnimation(
+            child: CheckmarkDrawAnimation(
+              key: ValueKey(_checkmarkCounter),
               color: Colors.green,
               size: 80,
-              duration: Duration(milliseconds: 800),
+              duration: const Duration(milliseconds: 800),
             ),
           ),
           const SizedBox(height: 24),
@@ -153,6 +155,8 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
               ),
             ),
             onPressed: () {
+              // Retrasar la navegación para permitir que se vea la animación
+              if (!mounted) return;
               // Marcar como completado en Firebase
               ref.read(questionsProvider.notifier).completeQuestionnaire();
 
@@ -519,16 +523,16 @@ class _CheckmarkPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.0 // Volver al grosor original
+      ..strokeWidth = 8.0 // Volver al grosor original
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final path = Path();
 
     // Puntos del check mark ajustados para quedar dentro del círculo
-    final startPoint = Offset(size.width * 0.30, size.height * 0.55);
-    final midPoint = Offset(size.width * 0.45, size.height * 0.68);
-    final endPoint = Offset(size.width * 0.70, size.height * 0.35);
+    final startPoint = Offset(size.width * 0.45, size.height * 0.50);
+    final midPoint = Offset(size.width * 0.48, size.height * 0.65);
+    final endPoint = Offset(size.width * 0.55, size.height * 0.30);
 
     // Calcular la longitud total del trazo
     final totalLength =
