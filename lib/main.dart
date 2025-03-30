@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xenify/data/notification_service.dart';
 import 'package:xenify/presentation/providers/auth_provider.dart';
 import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart';
 import 'package:xenify/presentation/screens/auth_screen.dart';
@@ -11,8 +12,17 @@ import 'package:xenify/presentation/screens/user_data_completion_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar SharedPreferences
-  Firebase.initializeApp();
+  // Inicializar Firebase
+  await Firebase.initializeApp();
+
+  // Inicializar servicio de notificaciones
+  final notificationService = NotificationService();
+  try {
+    await notificationService.initialize();
+    print('✅ Servicio de notificaciones inicializado correctamente en main');
+  } catch (e) {
+    print('❌ Error inicializando notificaciones en main: $e');
+  }
 
   // Inicializar SharedPreferences
   final prefs = await SharedPreferences.getInstance();
