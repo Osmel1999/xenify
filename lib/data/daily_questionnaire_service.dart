@@ -1,96 +1,128 @@
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
-import 'package:xenify/domain/entities/daily_questionnaire_response.dart';
-import 'package:xenify/domain/entities/daily_questionnaire_type.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart'
+    show SharedPreferences;
+import 'package:xenify/domain/entities/daily_questionnaire.dart';
 
 class DailyQuestionnaireService {
-  static const String _questionnairesKey = 'daily_questionnaires';
+  static const String _morningKey = 'morning_questionnaire';
+  static const String _eveningKey = 'evening_questionnaire';
+  static const String _lastCompletionKey = 'last_questionnaire_completion';
+  static const String _initialSetupKey = 'initial_setup_completed';
 
-  // Verifica si un cuestionario específico ya fue completado hoy
-  static Future<bool> isQuestionnaireCompletedToday(
-      DailyQuestionnaireType type) async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedQuestionnaires = prefs.getStringList(_questionnairesKey) ?? [];
+  @protected
+  final SharedPreferences _prefs;
 
-    // Obtener fecha actual en formato YYYY-MM-DD
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  DailyQuestionnaireService(this._prefs);
 
-    // Buscar si existe un cuestionario del tipo especificado para el día de hoy
-    for (var item in storedQuestionnaires) {
-      final Map<String, dynamic> questionnaire =
-          Map<String, dynamic>.from(jsonDecode(item));
+  bool get isInitialSetupCompleted => _prefs.getBool(_initialSetupKey) ?? false;
 
-      if (questionnaire['date'] == today &&
-          questionnaire['questionnaireType'] == type.toString()) {
-        return true;
-      }
-    }
-
-    return false;
+  Future<void> setInitialSetupCompleted(bool completed) async {
+    await _prefs.setBool(_initialSetupKey, completed);
   }
 
-  // Guarda una respuesta de cuestionario
-  static Future<void> saveQuestionnaireResponse(
-      DailyQuestionnaireType type, Map<String, dynamic> responses) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final storedQuestionnaires =
-          prefs.getStringList(_questionnairesKey) ?? [];
+  Future<void> saveDailyQuestionnaire(DailyQuestionnaire questionnaire) async {
+    // Si el setup inicial no está completado, no guardamos cuestionarios
+    if (!isInitialSetupCompleted) return;
 
-      // Crear nuevo objeto de respuesta
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final newResponse = DailyQuestionnaireResponse(
-        date: today,
-        questionnaireType: type.toString(),
-        responses: responses,
-      );
-
-      // Agregar a la lista de cuestionarios
-      storedQuestionnaires.add(jsonEncode(newResponse.toJson()));
-
-      // Guardar la lista actualizada
-      await prefs.setStringList(_questionnairesKey, storedQuestionnaires);
-    } catch (e) {
-      print('Error guardando cuestionario: $e');
-      rethrow;
-    }
+    final key = questionnaire.isMorning ? _morningKey : _eveningKey;
+    await _prefs.setString(key, jsonEncode(questionnaire.toJson()));
+    await _prefs.setString(
+        _lastCompletionKey, DateTime.now().toIso8601String());
   }
 
-  // Obtiene las respuestas de cuestionarios por tipo y fecha
-  static Future<List<DailyQuestionnaireResponse>> getQuestionnaireResponses({
-    DailyQuestionnaireType? type,
-    DateTime? date,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final storedQuestionnaires =
-          prefs.getStringList(_questionnairesKey) ?? [];
-      final results = <DailyQuestionnaireResponse>[];
+  DailyQuestionnaire? getTodayQuestionnaire(QuestionnaireType type) {
+    // Si el setup inicial no está completado, no mostramos cuestionarios
+    if (!isInitialSetupCompleted) return null;
 
-      String? dateFilter;
-      if (date != null) {
-        dateFilter = DateFormat('yyyy-MM-dd').format(date);
+    final key = type == QuestionnaireType.morning ? _morningKey : _eveningKey;
+    final data = _prefs.getString(key);
+
+    if (data != null) {
+      final questionnaire = DailyQuestionnaire.fromJson(jsonDecode(data));
+      // Verificar si el cuestionario es de hoy
+      if (questionnaire.date.year == DateTime.now().year &&
+          questionnaire.date.month == DateTime.now().month &&
+          questionnaire.date.day == DateTime.now().day) {
+        return questionnaire;
       }
-
-      for (var item in storedQuestionnaires) {
-        final questionnaire =
-            DailyQuestionnaireResponse.fromJson(jsonDecode(item));
-
-        bool matchesType =
-            type == null || questionnaire.questionnaireType == type.toString();
-        bool matchesDate =
-            dateFilter == null || questionnaire.date == dateFilter;
-
-        if (matchesType && matchesDate) {
-          results.add(questionnaire);
-        }
-      }
-
-      return results;
-    } catch (e) {
-      print('Error obteniendo cuestionarios: $e');
-      return [];
     }
+    return null;
+  }
+
+  bool shouldShowQuestionnaire(QuestionnaireType type) {
+    // Si el setup inicial no está completado, no mostramos cuestionarios
+    if (!isInitialSetupCompleted) return false;
+
+    final now = DateTime.now();
+    final currentHour = now.hour;
+
+    // Verificar si ya se completó el cuestionario hoy
+    final todayQuestionnaire = getTodayQuestionnaire(type);
+    if (todayQuestionnaire?.isCompleted ?? false) {
+      return false;
+    }
+
+    // Si es después de las 6 PM y no se completó el cuestionario matutino,
+    // debemos mostrar un cuestionario combinado
+    if (currentHour >= 18 && type == QuestionnaireType.evening) {
+      final morningQuestionnaire =
+          getTodayQuestionnaire(QuestionnaireType.morning);
+      return morningQuestionnaire == null || !morningQuestionnaire.isCompleted;
+    }
+
+    // Para cuestionario matutino: mostrar entre 5 AM y 11 AM
+    if (type == QuestionnaireType.morning) {
+      return currentHour >= 5 && currentHour < 11;
+    }
+
+    // Para cuestionario nocturno: mostrar entre 6 PM y 11 PM
+    return currentHour >= 18 && currentHour < 23;
+  }
+
+  bool didCompleteBothQuestionnaires() {
+    // Si el setup inicial no está completado, consideramos que no hay cuestionarios
+    if (!isInitialSetupCompleted) return true;
+
+    final morning = getTodayQuestionnaire(QuestionnaireType.morning);
+    final evening = getTodayQuestionnaire(QuestionnaireType.evening);
+
+    return (morning?.isCompleted ?? false) && (evening?.isCompleted ?? false);
+  }
+
+  DailyQuestionnaire createNewQuestionnaire(QuestionnaireType type) {
+    return DailyQuestionnaire(
+      type: type,
+      date: DateTime.now(),
+    );
+  }
+
+  List<String> getPendingQuestions(QuestionnaireType type) {
+    final List<String> questions = [];
+    final currentHour = DateTime.now().hour;
+    final isCombinedQuestionnaire = currentHour >= 18 &&
+        getTodayQuestionnaire(QuestionnaireType.morning) == null;
+
+    if (type == QuestionnaireType.morning || isCombinedQuestionnaire) {
+      questions.addAll([
+        '¿Cómo calificarías la calidad de tu sueño?',
+        '¿Cuáles son tus niveles de energía al despertar?',
+        '¿Cuál es tu estado de ánimo al despertar?',
+        '¿Has ido al baño esta mañana?',
+        '¿Qué desayunaste?',
+      ]);
+    }
+
+    if (type == QuestionnaireType.evening) {
+      questions.addAll([
+        '¿Cuáles fueron tus niveles de energía durante el día?',
+        '¿Cuál fue tu estado de ánimo durante el día?',
+        '¿Cuántas veces fuiste al baño hoy?',
+        '¿Qué almorzaste?',
+        '¿Qué cenaste?',
+      ]);
+    }
+
+    return questions;
   }
 }

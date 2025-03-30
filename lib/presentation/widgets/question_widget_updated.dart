@@ -512,8 +512,22 @@ class QuestionWidgetUpdated extends ConsumerWidget {
         );
 
       case QuestionType.medication:
-        // Obtener medicamentos actuales del estado
-        final medications = (currentAnswer as List<Medication>?) ?? [];
+        // Obtener medicamentos actuales del estado y convertirlos al tipo correcto
+        List<Medication> medications = [];
+        if (currentAnswer != null) {
+          if (currentAnswer is List) {
+            medications = currentAnswer
+                .map((item) {
+                  if (item is Medication) return item;
+                  if (item is Map<String, dynamic>) {
+                    return Medication.fromJson(item);
+                  }
+                  return null;
+                })
+                .whereType<Medication>()
+                .toList();
+          }
+        }
 
         return MedicationForm(
           medications: medications,

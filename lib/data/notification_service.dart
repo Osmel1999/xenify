@@ -5,9 +5,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzl;
 import 'package:xenify/data/provider_container.dart';
-import 'package:xenify/domain/entities/meal_notification_config.dart';
-import 'package:xenify/domain/entities/daily_questionnaire_type.dart';
-import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._();
@@ -17,21 +14,18 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static const String MEDICATION_CHANNEL = 'medication_channel';
-  static const String POST_MEAL_CHANNEL = 'post_meal_channel';
-  static const String DAILY_QUESTIONNAIRE_CHANNEL =
-      'daily_questionnaire_channel';
-  static const String MORNING_QUESTIONNAIRE_CHANNEL =
-      'morning_questionnaire_channel';
-  static const String EVENING_QUESTIONNAIRE_CHANNEL =
-      'evening_questionnaire_channel';
 
-  NotificationService._();
+  late final tz.Location _local;
+
+  NotificationService._() {
+    tzl.initializeTimeZones();
+    _local = tz.getLocation('America/Bogota');
+  }
 
   Future<void> initialize() async {
     try {
       print('🔔 Inicializando servicio de notificaciones...');
-
-      tzl.initializeTimeZones();
+      // tzl.initializeTimeZones();
 
       // Configuración para Android
       const androidSettings =
@@ -75,7 +69,6 @@ class NotificationService {
       }
 
       print('🔔 Servicio de notificaciones inicializado correctamente');
-      await scheduleAllDailyQuestionnaires();
     } catch (e) {
       print('❌ Error inicializando notificaciones: $e');
       rethrow;
@@ -89,6 +82,9 @@ class NotificationService {
     int intervalHours,
   ) async {
     try {
+      // Primero cancelar notificaciones existentes
+      await cancelMedicationNotifications(medicationName, startDate);
+
       const androidDetails = AndroidNotificationDetails(
         MEDICATION_CHANNEL,
         'Medication Reminders',
@@ -112,78 +108,59 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      final baseId =
-          "${medicationName.hashCode}${startDate.millisecondsSinceEpoch}"
-              .hashCode;
+      final now = DateTime.now();
 
-      if (endDate == null) {
-        // Para medicaciones indefinidas, programamos las próximas 24 horas * 7 días
-        final now = DateTime.now();
-        DateTime scheduleTime = now;
+      // Calcular cuántas dosis diarias hay
+      final dosesPerDay = 24 ~/ intervalHours;
 
-        // Calcular la primera notificación
-        if (startDate.isAfter(now)) {
-          scheduleTime = startDate;
-        } else {
-          // Encontrar el próximo horario basado en el intervalo
-          final hoursSinceStart = now.difference(startDate).inHours;
-          final nextInterval =
-              ((hoursSinceStart / intervalHours).ceil() * intervalHours);
-          scheduleTime = startDate.add(Duration(hours: nextInterval));
+      // Para cada dosis diaria
+      for (var i = 0; i < dosesPerDay; i++) {
+        // Calcular la hora de esta dosis
+        var doseTime = DateTime(
+          startDate.year,
+          startDate.month,
+          startDate.day,
+          startDate.hour + (i * intervalHours),
+          startDate.minute,
+        );
+
+        // Si la hora ya pasó hoy, ajustar para que empiece desde hoy
+        if (doseTime.isBefore(now)) {
+          doseTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            doseTime.hour,
+            doseTime.minute,
+          );
         }
 
-        // Programar las próximas notificaciones (7 días)
-        for (var i = 0; i < (24 * 7 / intervalHours).ceil(); i++) {
-          if (scheduleTime.isAfter(now)) {
-            final notificationId = baseId + i;
+        // Crear ID único para esta dosis específica
+        final doseId =
+            "${medicationName}_${doseTime.hour}_${doseTime.minute}".hashCode;
 
-            await _notifications.zonedSchedule(
-              notificationId,
-              '¡Hora de tu medicamento!',
-              'Es momento de tomar $medicationName',
-              tz.TZDateTime.from(scheduleTime, tz.local),
-              notificationDetails,
-              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-              matchDateTimeComponents: DateTimeComponents.time,
-            );
-          }
-          scheduleTime = scheduleTime.add(Duration(hours: intervalHours));
-        }
+        print('🔔 Programando dosis para $medicationName:');
+        print('- Hora: ${doseTime.hour}:${doseTime.minute}');
 
-        // Programar una notificación para recordar reprogramar en 6 días
-        final reminderDate = now.add(const Duration(days: 6));
+        // Programar notificación recurrente
         await _notifications.zonedSchedule(
-          baseId + 999999,
-          'Actualización de recordatorios',
-          'Hace tiempo no registras tu dosis de $medicationName',
-          tz.TZDateTime.from(reminderDate, tz.local),
+          doseId,
+          '¡Hora de tu medicamento!',
+          'Es momento de tomar $medicationName',
+          tz.TZDateTime.from(doseTime, tz.local),
           notificationDetails,
           androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents:
+              endDate == null ? DateTimeComponents.time : null,
         );
-      } else {
-        // El código existente para medicaciones con fecha de fin
-        var currentDate = startDate;
-        var counter = 0;
 
-        while (currentDate.isBefore(endDate)) {
-          if (currentDate.isAfter(DateTime.now())) {
-            await _notifications.zonedSchedule(
-              baseId + counter,
-              '¡Hora de tu medicamento!',
-              'Es momento de tomar $medicationName',
-              tz.TZDateTime.from(currentDate, tz.local),
-              notificationDetails,
-              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-            );
-          }
-          currentDate = currentDate.add(Duration(hours: intervalHours));
-          counter++;
+        print('✅ Notificación programada con ID: $doseId');
+        if (endDate != null) {
+          print('- Hasta: ${endDate.toString()}');
+        } else {
+          print('- Repetición: Diaria');
         }
       }
     } catch (e) {
@@ -192,182 +169,59 @@ class NotificationService {
     }
   }
 
-  Future<void> schedulePostMealNotifications(
-      List<MealNotificationConfig> mealConfigs) async {
-    try {
-      var androidDetails = AndroidNotificationDetails(
-        POST_MEAL_CHANNEL,
-        'Post-meal Reminders',
-        channelDescription: 'Notifications for post-meal reminders',
-        importance: Importance.high,
-        priority: Priority.high,
-        enableVibration: true,
-        vibrationPattern: Int64List.fromList([0, 300, 100, 300]),
-        sound: const RawResourceAndroidNotificationSound('medication_alert'),
-      );
-
-      const iosDetails = DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        sound: 'medication_alert',
-        interruptionLevel: InterruptionLevel.active,
-        categoryIdentifier: POST_MEAL_CHANNEL,
-      );
-
-      final notificationDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      final now = DateTime.now();
-
-      for (var config in mealConfigs) {
-        if (!config.isEnabled) continue;
-
-        final timeComponents = config.time.split(':');
-        final hour = int.parse(timeComponents[0]);
-        final minute = int.parse(timeComponents[1]);
-
-        // Crear el ID base para las notificaciones de esta comida
-        final baseId = "${config.mealType}_${config.time}".hashCode;
-
-        // Programar para los próximos 7 días
-        for (var i = 0; i < 7; i++) {
-          var scheduleDate = DateTime(
-            now.year,
-            now.month,
-            now.day + i,
-            hour,
-            minute,
-          );
-
-          // Si la hora ya pasó hoy, comenzar desde mañana
-          if (i == 0 && scheduleDate.isBefore(now)) {
-            continue;
-          }
-
-          await _notifications.zonedSchedule(
-            baseId + i,
-            'Registro Post-${_getMealName(config.mealType)}',
-            '¿Cómo te sientes después de tu ${_getMealName(config.mealType)}?',
-            tz.TZDateTime.from(scheduleDate, tz.local),
-            notificationDetails,
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.time,
-          );
-        }
-
-        // Programar recordatorio para reprogramar en 6 días
-        final reminderDate = now.add(const Duration(days: 6));
-        await _notifications.zonedSchedule(
-          baseId + 999999,
-          'Actualización de recordatorios',
-          'Hace tiempo no registras tu post-${_getMealName(config.mealType)}',
-          tz.TZDateTime.from(reminderDate, tz.local),
-          notificationDetails,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      }
-    } catch (e) {
-      print('❌ Error programando notificaciones post-comida: $e');
-      rethrow;
-    }
-  }
-
-  String _getMealName(String mealType) {
-    switch (mealType) {
-      case 'breakfast':
-        return 'desayuno';
-      case 'lunch':
-        return 'almuerzo';
-      case 'dinner':
-        return 'cena';
-      default:
-        return 'comida';
-    }
-  }
-
-  Future<void> cancelMealNotifications(String mealType) async {
-    final notificationId = "${mealType}_notification".hashCode;
-    await _notifications.cancel(notificationId);
-  }
-
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
+  }
+
+  Future<void> _cancelDailyNotifications() async {
+    try {
+      print('🔄 Cancelando notificaciones diarias existentes');
+      // Cancelar usando los IDs fijos
+      await _notifications.cancel(9001); // ID matutino
+      await _notifications.cancel(9002); // ID nocturno
+      print('✅ Notificaciones diarias canceladas');
+    } catch (e) {
+      print('❌ Error cancelando notificaciones diarias: $e');
+      rethrow;
+    }
   }
 
   Future<void> cancelMedicationNotifications(
       String medicationName, DateTime startDate) async {
     try {
-      final baseId =
-          "${medicationName.hashCode}${startDate.millisecondsSinceEpoch}"
-              .hashCode;
-      await _notifications.cancel(baseId);
+      print('🔄 Cancelando notificaciones existentes para: $medicationName');
 
-      // Cancelar todas las notificaciones posibles en un rango de 30 días
-      for (var i = 0; i < 720; i++) {
-        await _notifications.cancel(baseId + i);
-      }
+      // Cancelar todas las notificaciones pendientes
+      await _notifications.cancelAll();
+
+      print('✅ Todas las notificaciones canceladas');
     } catch (e) {
       print('❌ Error cancelando notificaciones de medicamentos: $e');
       rethrow;
     }
   }
 
-  // Programar notificaciones para todos los cuestionarios diarios
-  Future<void> scheduleAllDailyQuestionnaires() async {
-    // Programar cuestionario de sueño para las 7:00 AM
-    await scheduleDailyQuestionnaireNotification(
-        DailyQuestionnaireType.sleep,
-        7, // hora
-        0, // minuto
-        'Cuestionario de sueño',
-        '¿Cómo dormiste anoche? Completa tu cuestionario matutino.');
-
-    // Programar cuestionario matutino para las 9:00 AM
-    await scheduleDailyQuestionnaireNotification(
-        DailyQuestionnaireType.morning,
-        9, // hora
-        0, // minuto
-        'Cuestionario matutino',
-        '¡Buenos días! Completa tu cuestionario de la mañana.');
-
-    // Programar cuestionario de tarde para las 15:00 PM
-    await scheduleDailyQuestionnaireNotification(
-        DailyQuestionnaireType.afternoon,
-        15, // hora
-        0, // minuto
-        'Cuestionario de tarde',
-        '¿Cómo va tu día? Completa tu cuestionario de la tarde.');
-
-    // Programar cuestionario nocturno para las 20:00 PM
-    await scheduleDailyQuestionnaireNotification(
-        DailyQuestionnaireType.evening,
-        20, // hora
-        0, // minuto
-        'Cuestionario nocturno',
-        'Antes de terminar el día, completa tu cuestionario nocturno.');
+  bool _isValidTime(DateTime time) {
+    return time.year > 1 &&
+        time.hour >= 0 &&
+        time.hour < 24 &&
+        time.minute >= 0 &&
+        time.minute < 60;
   }
 
-  // Programar una notificación para un cuestionario diario específico
-  Future<void> scheduleDailyQuestionnaireNotification(
-    DailyQuestionnaireType type,
-    int hour,
-    int minute,
-    String title,
-    String body,
-  ) async {
+  Future<void> scheduleWakeAndSleepNotifications(
+      DateTime wakeUpTime, DateTime sleepTime) async {
     try {
+      if (!_isValidTime(wakeUpTime) || !_isValidTime(sleepTime)) {
+        throw Exception('Horarios de despertar o dormir inválidos');
+      }
+
+      print('🔔 Programando notificaciones diarias matutinas y nocturnas');
+
       const androidDetails = AndroidNotificationDetails(
-        DAILY_QUESTIONNAIRE_CHANNEL,
-        'Cuestionarios Diarios',
-        channelDescription:
-            'Notificaciones para los cuestionarios diarios de salud',
+        MEDICATION_CHANNEL,
+        'Notificaciones Diarias',
+        channelDescription: 'Notificaciones para recordatorios diarios',
         importance: Importance.high,
         priority: Priority.high,
         enableVibration: true,
@@ -385,60 +239,74 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      // Calcular la hora para la notificación (hoy o mañana)
+      // Cancelar notificaciones existentes antes de programar nuevas
+      await _cancelDailyNotifications();
+
+      // Crear DateTime con la fecha actual y la hora especificada
       final now = DateTime.now();
-      var scheduledDate = DateTime(
+      final todayWakeUpTime = DateTime(
         now.year,
         now.month,
         now.day,
-        hour,
-        minute,
+        wakeUpTime.hour,
+        wakeUpTime.minute,
       );
 
-      // Si la hora ya pasó hoy, programar para mañana
-      if (scheduledDate.isBefore(now)) {
-        scheduledDate = scheduledDate.add(const Duration(days: 1));
-      }
+      // Notificación matutina (30 minutos después de despertar)
+      final wakeNotificationTime =
+          todayWakeUpTime.add(const Duration(minutes: 30));
 
-      // Crear payload con información del tipo de cuestionario
-      final payload = NotificationData(
-        id: type.hashCode,
-        title: title,
-        body: body,
-        scheduledDate: scheduledDate,
-        type: 'daily_questionnaire_${type.toString().split('.').last}',
-      ).toJson();
-
-      // Programar notificación repetitiva diaria
       await _notifications.zonedSchedule(
-        type.hashCode,
-        title,
-        body,
-        tz.TZDateTime.from(scheduledDate, tz.local),
+        9001, // ID fijo para notificación matutina
+        'Buenos días',
+        '¡Te deseamos un excelente día!, me gustaría saber cómo te sientes!',
+        tz.TZDateTime.from(wakeNotificationTime, _local),
         notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents:
-            DateTimeComponents.time, // Repite diariamente a la misma hora
-        payload: jsonEncode(payload),
+            DateTimeComponents.time, // Hacer recurrente diariamente
       );
 
+      print('✅ Notificación matutina programada:');
+      print('- ID: 9001');
       print(
-          '🔔 Notificación de cuestionario ${type.toString()} programada para las $hour:$minute');
+          '- Hora: ${wakeNotificationTime.hour}:${wakeNotificationTime.minute}');
+
+      // Crear DateTime con la fecha actual y la hora de dormir
+      final todaySleepTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        sleepTime.hour,
+        sleepTime.minute,
+      );
+
+      // Notificación nocturna (30 minutos antes de dormir)
+      final sleepNotificationTime =
+          todaySleepTime.subtract(const Duration(minutes: 30));
+
+      await _notifications.zonedSchedule(
+        9002, // ID fijo para notificación nocturna
+        'Buenas noches',
+        '¡Que descanses! me gustaría saber cómo te sentiste hoy!',
+        tz.TZDateTime.from(sleepNotificationTime, _local),
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+
+      print('✅ Notificación nocturna programada:');
+      print('- ID: 9002');
+      print(
+          '- Hora: ${sleepNotificationTime.hour}:${sleepNotificationTime.minute}');
     } catch (e) {
-      print('❌ Error programando notificación de cuestionario: $e');
+      print('❌ Error programando notificaciones de despertar y dormir: $e');
       rethrow;
     }
-  }
-
-  void activateDailyQuestionnaire(DailyQuestionnaireType type) {
-    print('🔔 Activando cuestionario de tipo: ${type.toString()}');
-
-    // Acceder al provider desde fuera del árbol de widgets usando el contenedor global
-    providerContainer
-        .read(dailyQuestionnaireStateProvider.notifier)
-        .showQuestionnaire(type);
   }
 }
 

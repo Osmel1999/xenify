@@ -603,7 +603,12 @@ class QuestionWidget extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onChanged: (value) => _submitAnswer(ref, question.id, value),
+                  onChanged: (DateTime? value) {
+                    if (value != null) {
+                      // Enviar el DateTime tal cual, será normalizado en el notifier
+                      _submitAnswer(ref, question.id, value);
+                    }
+                  },
                 ),
               ),
             ),
