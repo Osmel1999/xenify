@@ -82,16 +82,15 @@ class QuestionWidgetUpdated extends ConsumerWidget {
             decoration:
                 QuestionnaireTheme.getCategoryHeaderDecoration(category),
           ),
-          // Mostrar el texto de la pregunta solo si no es una pregunta de frecuencia
-          if (question.type != QuestionType.frequencySelect)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                question.text,
-                style: QuestionnaireTheme.questionTextStyle,
-                textAlign: TextAlign.left,
-              ),
+          // Mostrar el texto de la pregunta
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              question.text,
+              style: QuestionnaireTheme.questionTextStyle,
+              textAlign: TextAlign.left,
             ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: _buildInputField(context, question, ref, category),
@@ -595,65 +594,7 @@ class QuestionWidgetUpdated extends ConsumerWidget {
           ],
         );
 
-      case QuestionType.frequencySelect:
-        // Obtener la proteína actual y el texto personalizado
-        final currentProtein = state.currentProtein;
-
-        if (currentProtein == null) {
-          return const Center(
-            child: Text('Error: No hay proteína seleccionada'),
-          );
-        }
-
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Consumer(
-              builder: (context, ref, _) {
-                final state = ref.watch(questionsProvider);
-                return Text(
-                  question.text
-                      .replaceAll('%protein%', state.currentProtein ?? ''),
-                  style: QuestionnaireTheme.questionTextStyle,
-                  textAlign: TextAlign.left,
-                );
-              },
-            ),
-            const SizedBox(height: 16.0),
-            ...question.options!.map((frequency) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
-                  child: _buildButton(
-                    text: frequency,
-                    onPressed: () {
-                      // Actualizar la frecuencia para la proteína actual
-                      final proteinFrequency = {
-                        'protein': currentProtein,
-                        'frequency': frequency,
-                      };
-
-                      // Obtener las frecuencias existentes
-                      final currentFrequencies =
-                          (state.answers['protein_frequencies']
-                                  as List<Map<String, String>>?) ??
-                              [];
-
-                      // Actualizar con la nueva frecuencia
-                      final updatedFrequencies = [
-                        ...currentFrequencies,
-                        proteinFrequency as Map<String, String>,
-                      ];
-
-                      // Usar answerQuestion directamente para manejar la lógica de proteínas
-                      ref
-                          .read(questionsProvider.notifier)
-                          .answerQuestion(question.id, updatedFrequencies);
-                    },
-                    color: categoryColor,
-                    isPrimary: false,
-                  ),
-                )),
-          ],
-        );
+      // Caso eliminado: QuestionType.frequencySelect
 
       default:
         return Container(

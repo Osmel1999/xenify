@@ -285,14 +285,6 @@ final questionsList = [
     dependsOn: ['Sin gluten'],
   ),
 
-  Question(
-    id: 'protein_frequency',
-    text: '¿Cuántas veces a la semana consumes %protein%?',
-    type: QuestionType.frequencySelect,
-    options: ['1 vez', '2 veces', '3 veces', '4 veces', '5 o más veces'],
-    parentId: 'protein_sources',
-  ),
-
   // Preguntas comunes para todas las dietas
   Question(
     id: 'vegetables',

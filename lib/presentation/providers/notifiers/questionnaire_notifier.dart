@@ -35,51 +35,6 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
       }
     }
 
-    // Si la respuesta es una selección de proteínas, almacenarlas para las preguntas de frecuencia
-    if (questionId == 'protein_sources_omnivore' ||
-        questionId == 'protein_sources_vegetarian' ||
-        questionId == 'protein_sources_vegan' ||
-        questionId == 'protein_sources_glutenfree') {
-      if (answer is List<String> && answer.isNotEmpty) {
-        // Establecer la primera proteína seleccionada como la actual
-        String firstProtein = answer[0];
-        // Guardar el resto de proteínas para preguntas futuras
-        List<String> remainingProteins = answer.sublist(1);
-
-        newAnswers['currentProtein'] = firstProtein;
-
-        state = state.copyWith(
-          answers: newAnswers,
-          currentProtein: firstProtein,
-          remainingProteins: remainingProteins,
-          currentQuestionIndex: state.currentQuestionIndex,
-          questionHistory: newHistory,
-        );
-      }
-    }
-
-    // Si estamos en una pregunta de frecuencia y hay más proteínas por procesar
-    if (questionId.contains('protein_frequency') &&
-        state.remainingProteins.isNotEmpty) {
-      // Tomar la siguiente proteína de la lista
-      String nextProtein = state.remainingProteins[0];
-      List<String> updatedRemainingProteins =
-          List<String>.from(state.remainingProteins)..removeAt(0);
-
-      // Actualizar el estado con la siguiente proteína
-      state = state.copyWith(
-        answers: newAnswers,
-        currentProtein: nextProtein,
-        remainingProteins: updatedRemainingProteins,
-        // Mantener el mismo índice para volver a la misma pregunta de frecuencia
-        currentQuestionIndex: state.currentQuestionIndex,
-        questionHistory: newHistory,
-      );
-
-      // No avanzar a la siguiente pregunta aún
-      return;
-    }
-
     // Determinar la siguiente pregunta
     int nextIndex =
         _findNextQuestionWithDependencies(questionId, answer, newAnswers);
@@ -94,13 +49,6 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     } else {
       final nextQuestion = questionsList[nextIndex];
       String questionText = nextQuestion.text;
-
-      // Si es una pregunta de frecuencia y hay una proteína actual, personalizar el texto
-      if (nextQuestion.id == 'protein_frequency' &&
-          state.currentProtein != null) {
-        questionText =
-            nextQuestion.text.replaceAll('%protein%', state.currentProtein!);
-      }
 
       state = state.copyWith(
         answers: newAnswers,
@@ -154,29 +102,6 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
 
   void updateAnswer(String questionId, dynamic answer) {
     final newAnswers = {...state.answers, questionId: answer};
-
-    // Manejar la selección de proteínas
-    if (questionId == 'protein_sources_omnivore' ||
-        questionId == 'protein_sources_vegetarian' ||
-        questionId == 'protein_sources_vegan' ||
-        questionId == 'protein_sources_glutenfree') {
-      if (answer is List<String> && answer.isNotEmpty) {
-        // Inicializar la lista de proteínas restantes y establecer la proteína actual
-        state = state.copyWith(
-          answers: newAnswers,
-          remainingProteins: List<String>.from(answer),
-          currentProtein: answer.first,
-        );
-        return;
-      }
-    }
-
-    // Para la pregunta de frecuencia, actualizar el estado pero mantener la proteína actual
-    if (questionId == 'protein_frequency') {
-      state = state.copyWith(answers: newAnswers);
-      return;
-    }
-
     state = state.copyWith(answers: newAnswers);
   }
 
@@ -197,62 +122,7 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     final newHistory = List<int>.from(state.questionHistory)..removeLast();
     final previousIndex =
         state.questionHistory.isNotEmpty ? state.questionHistory.last : 0;
-    final previousQuestion = questionsList[previousIndex];
 
-    // Si estamos retrocediendo desde una pregunta de frecuencia
-    if (previousQuestion.id == 'protein_frequency') {
-      // Obtener todas las proteínas seleccionadas originalmente
-      String? proteinSourceId;
-      if (state.answers.containsKey('protein_sources_omnivore')) {
-        proteinSourceId = 'protein_sources_omnivore';
-      } else if (state.answers.containsKey('protein_sources_vegetarian')) {
-        proteinSourceId = 'protein_sources_vegetarian';
-      } else if (state.answers.containsKey('protein_sources_vegan')) {
-        proteinSourceId = 'protein_sources_vegan';
-      } else if (state.answers.containsKey('protein_sources_glutenfree')) {
-        proteinSourceId = 'protein_sources_glutenfree';
-      }
-
-      if (proteinSourceId != null) {
-        final selectedProteins = state.answers[proteinSourceId] as List<String>;
-        final frequencies = state.answers['protein_frequencies']
-                as List<Map<String, String>>? ??
-            [];
-
-        // Encontrar qué proteínas ya han sido respondidas
-        final answeredProteins = frequencies.map((f) => f['protein']!).toList();
-
-        // Encontrar la proteína anterior en la secuencia original
-        String? previousProtein;
-        for (var i = 0; i < selectedProteins.length; i++) {
-          if (!answeredProteins.contains(selectedProteins[i])) {
-            if (i > 0) {
-              previousProtein = selectedProteins[i - 1];
-            }
-            break;
-          }
-        }
-
-        // Si no encontramos una proteína anterior, usar la última
-        previousProtein ??= selectedProteins.last;
-
-        // Actualizar el estado
-        state = state.copyWith(
-          currentQuestionIndex: previousIndex,
-          questionHistory: newHistory,
-          currentProtein: previousProtein,
-          remainingProteins: selectedProteins
-              .where((p) => !answeredProteins.contains(p))
-              .toList(),
-          currentQuestionText: questionsList[previousIndex]
-              .text
-              .replaceAll('%protein%', previousProtein),
-        );
-        return;
-      }
-    }
-
-    // Para otros tipos de preguntas
     state = state.copyWith(
       currentQuestionIndex: previousIndex,
       questionHistory: newHistory,
@@ -413,13 +283,6 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
           questionsList.indexWhere((q) => q.id == proteinQuestionId);
       if (proteinQuestionIndex != -1) {
         nextIndex = proteinQuestionIndex;
-      }
-    } else if (questionId.startsWith('protein_sources_')) {
-      // Después de seleccionar las proteínas, ir a la pregunta de frecuencia
-      final frequencyQuestionIndex =
-          questionsList.indexWhere((q) => q.id == 'protein_frequency');
-      if (frequencyQuestionIndex != -1) {
-        nextIndex = frequencyQuestionIndex;
       }
     }
 

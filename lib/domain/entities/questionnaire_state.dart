@@ -11,12 +11,10 @@ class QuestionnaireState {
   final List<FamilyCondition> familyConditions;
   final List<Medication> medications;
   final LocationData? locationData;
-  final String? currentProtein;
-  final List<String> remainingProteins;
   final bool isLowPerformanceMode;
   final List<Question> loadedQuestions;
   final int batchSize;
-  final String? currentQuestionText; // Nuevo campo para el texto personalizado
+  final String? currentQuestionText;
 
   QuestionnaireState({
     this.currentQuestionIndex = 0,
@@ -26,8 +24,6 @@ class QuestionnaireState {
     this.familyConditions = const [],
     this.medications = const [],
     this.locationData,
-    this.currentProtein,
-    this.remainingProteins = const [],
     this.isLowPerformanceMode = false,
     this.loadedQuestions = const [],
     this.batchSize = 10,
@@ -42,8 +38,6 @@ class QuestionnaireState {
     List<FamilyCondition>? familyConditions,
     List<Medication>? medications,
     LocationData? locationData,
-    String? currentProtein,
-    List<String>? remainingProteins,
     bool? isLowPerformanceMode,
     List<Question>? loadedQuestions,
     int? batchSize,
@@ -57,8 +51,6 @@ class QuestionnaireState {
       familyConditions: familyConditions ?? this.familyConditions,
       medications: medications ?? this.medications,
       locationData: locationData ?? this.locationData,
-      currentProtein: currentProtein ?? this.currentProtein,
-      remainingProteins: remainingProteins ?? this.remainingProteins,
       isLowPerformanceMode: isLowPerformanceMode ?? this.isLowPerformanceMode,
       loadedQuestions: loadedQuestions ?? this.loadedQuestions,
       batchSize: batchSize ?? this.batchSize,
@@ -76,8 +68,6 @@ class QuestionnaireState {
       'familyConditions': familyConditions.map((c) => c.toJson()).toList(),
       'medications': medications.map((m) => m.toJson()).toList(),
       'locationData': locationData?.toJson(),
-      'currentProtein': currentProtein,
-      'remainingProteins': remainingProteins,
       'isLowPerformanceMode': isLowPerformanceMode,
       'batchSize': batchSize,
     };
@@ -143,8 +133,6 @@ class QuestionnaireState {
       locationData: json['locationData'] != null
           ? LocationData.fromJson(json['locationData'] as Map<String, dynamic>)
           : null,
-      currentProtein: json['currentProtein'] as String?,
-      remainingProteins: List<String>.from(json['remainingProteins'] ?? []),
       isLowPerformanceMode: json['isLowPerformanceMode'] as bool? ?? false,
       batchSize: json['batchSize'] as int? ?? 10,
     );

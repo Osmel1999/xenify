@@ -33,5 +33,4 @@ enum QuestionType {
   familyHistory,
   location,
   dietaryOptions, // Nuevo tipo para opciones de dieta
-  frequencySelect, // Nuevo tipo para frecuencia de consumo
 }
