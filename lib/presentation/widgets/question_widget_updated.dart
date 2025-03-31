@@ -30,6 +30,9 @@ class QuestionWidgetUpdated extends ConsumerWidget {
     final progressText =
         "${state.currentQuestionIndex + 1}/${questionsList.length}";
 
+    // Asegurar que usamos el texto de la pregunta actual, no el guardado en el estado
+    final questionText = currentQuestion.text;
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -81,8 +84,8 @@ class QuestionWidgetUpdated extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Text(
-              // Usar el texto personalizado si está disponible
-              state.currentQuestionText ?? question.text,
+              // Usar siempre el texto de la pregunta actual, no el del estado
+              question.text,
               style: QuestionnaireTheme.questionTextStyle,
               textAlign: TextAlign.left,
             ),

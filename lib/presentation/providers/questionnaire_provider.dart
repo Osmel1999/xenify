@@ -331,11 +331,16 @@ final questionsList = [
 // Función para determinar la siguiente pregunta basada en respuestas anteriores
 int getNextQuestionIndex(String currentId, dynamic answer, int currentIndex) {
   // Lógica para el trabajo
-  if (currentId == 'occupation_type' &&
-      answer != 'Trabajo' &&
-      answer != 'Ambos') {
-    // Si no trabaja, saltamos la pregunta de detalles del trabajo
-    return questionsList.indexWhere((q) => q.id == 'has_pathology');
+  if (currentId == 'occupation_type') {
+    if (answer != 'Trabajo' && answer != 'Ambos') {
+      // Si no trabaja, buscamos la primera pregunta después de 'work_details'
+      final workDetailsIndex =
+          questionsList.indexWhere((q) => q.id == 'work_details');
+      if (workDetailsIndex != -1 &&
+          workDetailsIndex < questionsList.length - 1) {
+        return workDetailsIndex + 1;
+      }
+    }
   }
 
   // Mantener la lógica existente

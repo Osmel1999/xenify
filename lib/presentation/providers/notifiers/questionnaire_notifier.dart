@@ -25,7 +25,7 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     final newAnswers = {...state.answers, questionId: answer};
     final newHistory = [...state.questionHistory, state.currentQuestionIndex];
 
-    // Procesar horarios para notificaciones
+    // Procesar horarios para notificaciones si es necesario
     if (questionId == 'bed_time' || questionId == 'wake_up_time') {
       if (answer is DateTime) {
         _handleTimeAnswers(questionId, answer, newAnswers);
@@ -36,7 +36,8 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     }
 
     // Determinar la siguiente pregunta
-    int nextIndex = _findNextQuestionIndex(questionId, answer);
+    int nextIndex =
+        _findNextQuestionWithDependencies(questionId, answer, newAnswers);
 
     if (nextIndex >= questionsList.length) {
       state = state.copyWith(
@@ -120,9 +121,16 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     final previousIndex =
         state.questionHistory.isNotEmpty ? state.questionHistory.last : 0;
 
+    // Obtener el texto de la pregunta anterior
+    final previousQuestionText = previousIndex < questionsList.length
+        ? questionsList[previousIndex].text
+        : null;
+
     state = state.copyWith(
       currentQuestionIndex: previousIndex,
       questionHistory: newHistory,
+      currentQuestionText:
+          previousQuestionText, // Actualizar el texto de la pregunta
     );
   }
 
@@ -226,8 +234,125 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     );
   }
 
-  int _findNextQuestionIndex(String currentQuestionId, dynamic answer) {
-    return questionsList.indexWhere((q) => q.id == currentQuestionId) + 1;
+  int _findNextQuestionWithDependencies(
+      String questionId, dynamic answer, Map<String, dynamic> answers) {
+    final currentIndex = questionsList.indexWhere((q) => q.id == questionId);
+
+    // Caso base: si no encontramos la pregunta o es la última, devolver el final
+    if (currentIndex == -1 || currentIndex >= questionsList.length - 1) {
+      return questionsList.length;
+    }
+
+    int nextIndex = currentIndex + 1;
+
+    // Verificar flujos específicos basados en el ID de la pregunta
+    if (questionId == 'occupation_type') {
+      if (answer != 'Trabajo' && answer != 'Ambos') {
+        // Saltar a la pregunta después de 'work_details'
+        final workDetailsIndex =
+            questionsList.indexWhere((q) => q.id == 'work_details');
+        if (workDetailsIndex != -1 &&
+            workDetailsIndex < questionsList.length - 1) {
+          nextIndex = workDetailsIndex + 1;
+        }
+      }
+    } else if (questionId == 'has_pathology' && answer == false) {
+      nextIndex = questionsList.indexWhere((q) => q.id == 'has_family_history');
+    } else if (questionId == 'current_treatment' && answer == false) {
+      nextIndex = questionsList.indexWhere((q) => q.id == 'has_family_history');
+    } else if (questionId == 'has_family_history' && answer == false) {
+      nextIndex = questionsList.indexWhere((q) => q.id == 'digestive_issues');
+    } else if (questionId == 'diet_type') {
+      // Manejar el flujo especial para el tipo de dieta
+      print('🍽️ Tipo de dieta seleccionado: $answer');
+
+      // Buscar las siguientes preguntas dependientes del tipo de dieta
+      bool foundMatchingQuestion = false;
+
+      for (int i = currentIndex + 1; i < questionsList.length; i++) {
+        Question nextQuestion = questionsList[i];
+
+        // Si la pregunta depende de diet_type
+        if (nextQuestion.parentId == 'diet_type') {
+          // Verificar si la pregunta debería mostrarse basado en la respuesta
+          if (nextQuestion.dependsOn != null &&
+              nextQuestion.dependsOn!.contains(answer)) {
+            // Encontramos una pregunta que coincide con la dieta seleccionada
+            nextIndex = i;
+            foundMatchingQuestion = true;
+            break;
+          }
+        } else if (nextQuestion.parentId == null ||
+            nextQuestion.parentId != 'diet_type') {
+          // Si encontramos una pregunta no relacionada con diet_type,
+          // y no hemos encontrado una coincidencia, saltar a esta pregunta
+          if (!foundMatchingQuestion) {
+            nextIndex = i;
+            break;
+          }
+        }
+      }
+    }
+
+    // Verificar si la siguiente pregunta tiene dependencias que no se cumplen
+    while (nextIndex < questionsList.length) {
+      Question nextQuestion = questionsList[nextIndex];
+
+      // Si la pregunta tiene un parentId, verificar dependencias
+      if (nextQuestion.parentId != null && nextQuestion.dependsOn != null) {
+        String parentId = nextQuestion.parentId!;
+
+        // Obtener la respuesta a la pregunta padre
+        dynamic parentAnswer = answers[parentId];
+        print(
+            '🔄 Verificando dependencia: Pregunta ${nextQuestion.id} depende de $parentId = $parentAnswer');
+
+        // Si es una pregunta de selección múltiple, verificar si alguna de las opciones coincide
+        bool dependencyMet = false;
+
+        if (parentAnswer is String &&
+            nextQuestion.dependsOn!.contains(parentAnswer)) {
+          dependencyMet = true;
+        } else if (parentAnswer is List<String>) {
+          // Para preguntas multiselect, verificar si hay alguna coincidencia
+          for (String option in parentAnswer) {
+            if (nextQuestion.dependsOn!.contains(option)) {
+              dependencyMet = true;
+              break;
+            }
+          }
+        }
+
+        // Si no se cumple la dependencia, buscar la siguiente pregunta sin dependencia o con dependencia cumplida
+        if (!dependencyMet) {
+          print(
+              '❌ Dependencia no cumplida para ${nextQuestion.id}, buscando siguiente pregunta válida');
+
+          // Buscar la siguiente pregunta sin parentId o con un parentId diferente
+          bool foundNextValid = false;
+          for (int i = nextIndex + 1; i < questionsList.length; i++) {
+            if (questionsList[i].parentId != parentId) {
+              nextIndex = i;
+              foundNextValid = true;
+              break;
+            }
+          }
+
+          // Si no encontramos una pregunta válida, llegar al final
+          if (!foundNextValid) {
+            nextIndex = questionsList.length;
+          }
+
+          continue; // Verificar la nueva pregunta encontrada
+        }
+      }
+
+      // Si llegamos aquí, la pregunta es válida para mostrar
+      break;
+    }
+
+    print('➡️ Siguiente índice de pregunta: $nextIndex');
+    return nextIndex;
   }
 
   void _checkAndLoadMoreQuestions() {
