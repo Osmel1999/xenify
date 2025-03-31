@@ -209,8 +209,64 @@ final questionsList = [
     dependsOn: ['Sin gluten'],
   ),
 
+  // Preguntas de proteínas para cada tipo de dieta
   Question(
-    id: 'gluten_free_proteins',
+    id: 'protein_sources_omnivore',
+    text: '¿Qué fuentes de proteína consumes principalmente?',
+    type: QuestionType.multiSelect,
+    options: [
+      'Pollo',
+      'Pescado',
+      'Res',
+      'Cerdo',
+      'Cordero',
+      'Huevo',
+      'Legumbres',
+      'Frutos secos',
+    ],
+    parentId: 'diet_type',
+    dependsOn: ['Omnívora'],
+  ),
+
+  Question(
+    id: 'protein_sources_vegetarian',
+    text: '¿Qué fuentes de proteína consumes principalmente?',
+    type: QuestionType.multiSelect,
+    options: [
+      'Huevo',
+      'Legumbres',
+      'Tofu',
+      'Tempeh',
+      'Seitán',
+      'Frutos secos',
+      'Quinoa',
+      'Semillas',
+    ],
+    parentId: 'diet_type',
+    dependsOn: ['Vegetariana'],
+  ),
+
+  Question(
+    id: 'protein_sources_vegan',
+    text: '¿Qué fuentes de proteína consumes principalmente?',
+    type: QuestionType.multiSelect,
+    options: [
+      'Legumbres',
+      'Tofu',
+      'Tempeh',
+      'Seitán',
+      'Frutos secos',
+      'Quinoa',
+      'Semillas',
+      'Proteína de guisante',
+      'Proteína de soja',
+    ],
+    parentId: 'diet_type',
+    dependsOn: ['Vegana'],
+  ),
+
+  Question(
+    id: 'protein_sources_glutenfree',
     text: '¿Qué fuentes de proteína consumes principalmente?',
     type: QuestionType.multiSelect,
     options: [
@@ -230,39 +286,11 @@ final questionsList = [
   ),
 
   Question(
-    id: 'gluten_free_protein_frequency',
-    text: '¿Cuántas veces a la semana consumes %protein%?',
-    type: QuestionType.frequencySelect,
-    options: ['1 vez', '2 veces', '3 veces', '4 veces', '5 o más veces'],
-    parentId: 'gluten_free_proteins',
-  ),
-
-  // Preguntas específicas para dieta omnívora
-  Question(
-    id: 'omnivore_proteins',
-    text: '¿Qué proteínas animales consumes?',
-    type: QuestionType.multiSelect,
-    options: ['Pollo', 'Pescado', 'Res', 'Cerdo', 'Cordero', 'Huevo'],
-    parentId: 'diet_type',
-    dependsOn: ['Omnívora'],
-  ),
-
-  Question(
     id: 'protein_frequency',
     text: '¿Cuántas veces a la semana consumes %protein%?',
     type: QuestionType.frequencySelect,
     options: ['1 vez', '2 veces', '3 veces', '4 veces', '5 o más veces'],
-    parentId: 'omnivore_proteins',
-  ),
-
-  // Preguntas específicas para dieta vegetariana
-  Question(
-    id: 'vegetarian_proteins',
-    text: '¿Qué proteínas vegetarianas consumes?',
-    type: QuestionType.multiSelect,
-    options: ['Legumbres', 'Tofu', 'Tempeh', 'Seitán', 'Huevo'],
-    parentId: 'diet_type',
-    dependsOn: ['Vegetariana'],
+    parentId: 'protein_sources',
   ),
 
   // Preguntas comunes para todas las dietas

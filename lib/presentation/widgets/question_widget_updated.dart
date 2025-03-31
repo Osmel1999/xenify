@@ -68,6 +68,7 @@ class QuestionWidgetUpdated extends ConsumerWidget {
     bool isKeyboardVisible,
   ) {
     final state = ref.watch(questionsProvider);
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -81,15 +82,16 @@ class QuestionWidgetUpdated extends ConsumerWidget {
             decoration:
                 QuestionnaireTheme.getCategoryHeaderDecoration(category),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              // Usar siempre el texto de la pregunta actual, no el del estado
-              question.text,
-              style: QuestionnaireTheme.questionTextStyle,
-              textAlign: TextAlign.left,
+          // Mostrar el texto de la pregunta solo si no es una pregunta de frecuencia
+          if (question.type != QuestionType.frequencySelect)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                question.text,
+                style: QuestionnaireTheme.questionTextStyle,
+                textAlign: TextAlign.left,
+              ),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: _buildInputField(context, question, ref, category),
@@ -603,21 +605,21 @@ class QuestionWidgetUpdated extends ConsumerWidget {
           );
         }
 
-        // Reemplazar el placeholder con la proteína actual
-        final questionText =
-            question.text.replaceAll('%protein%', currentProtein);
-
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Text(
-                questionText,
-                style: QuestionnaireTheme.questionTextStyle,
-                textAlign: TextAlign.left,
-              ),
+            Consumer(
+              builder: (context, ref, _) {
+                final state = ref.watch(questionsProvider);
+                return Text(
+                  question.text
+                      .replaceAll('%protein%', state.currentProtein ?? ''),
+                  style: QuestionnaireTheme.questionTextStyle,
+                  textAlign: TextAlign.left,
+                );
+              },
             ),
+            const SizedBox(height: 16.0),
             ...question.options!.map((frequency) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: _buildButton(
@@ -641,19 +643,10 @@ class QuestionWidgetUpdated extends ConsumerWidget {
                         proteinFrequency as Map<String, String>,
                       ];
 
-                      // Actualizar las frecuencias
-                      ref.read(questionsProvider.notifier).updateAnswer(
-                          'protein_frequencies', updatedFrequencies);
-
-                      // Pasar a la siguiente proteína
-                      ref.read(questionsProvider.notifier).nextProtein();
-
-                      // Si no hay más proteínas, avanzar a la siguiente pregunta
-                      if (state.remainingProteins.length <= 1) {
-                        ref
-                            .read(questionsProvider.notifier)
-                            .answerQuestion(question.id, updatedFrequencies);
-                      }
+                      // Usar answerQuestion directamente para manejar la lógica de proteínas
+                      ref
+                          .read(questionsProvider.notifier)
+                          .answerQuestion(question.id, updatedFrequencies);
                     },
                     color: categoryColor,
                     isPrimary: false,
