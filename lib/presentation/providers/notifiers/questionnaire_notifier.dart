@@ -100,7 +100,35 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
 
   void updateAnswer(String questionId, dynamic answer) {
     final newAnswers = {...state.answers, questionId: answer};
+
+    // Manejar la selección de proteínas
+    if (questionId == 'omnivore_proteins' ||
+        questionId == 'gluten_free_proteins') {
+      if (answer is List<String> && answer.isNotEmpty) {
+        // Inicializar la lista de proteínas restantes
+        state = state.copyWith(
+            answers: newAnswers,
+            remainingProteins: List<String>.from(answer),
+            currentProtein: answer.first // Establecer la primera proteína
+            );
+        return;
+      }
+    }
+
     state = state.copyWith(answers: newAnswers);
+  }
+
+  void nextProtein() {
+    final remaining = List<String>.from(state.remainingProteins);
+
+    if (remaining.isNotEmpty) {
+      // Remover la proteína actual
+      remaining.removeAt(0);
+
+      state = state.copyWith(
+          remainingProteins: remaining,
+          currentProtein: remaining.isNotEmpty ? remaining.first : null);
+    }
   }
 
   void completeQuestionnaire() async {

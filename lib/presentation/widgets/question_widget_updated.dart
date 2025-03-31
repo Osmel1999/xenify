@@ -594,7 +594,7 @@ class QuestionWidgetUpdated extends ConsumerWidget {
         );
 
       case QuestionType.frequencySelect:
-        // Preparamos los datos necesarios para mostrar la pregunta de frecuencia
+        // Obtener la proteína actual y el texto personalizado
         final currentProtein = state.currentProtein;
 
         if (currentProtein == null) {
@@ -603,14 +603,27 @@ class QuestionWidgetUpdated extends ConsumerWidget {
           );
         }
 
+        // Reemplazar el placeholder con la proteína actual
+        final questionText =
+            question.text.replaceAll('%protein%', currentProtein);
+
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Text(
+                questionText,
+                style: QuestionnaireTheme.questionTextStyle,
+                textAlign: TextAlign.left,
+              ),
+            ),
             ...question.options!.map((frequency) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: _buildButton(
                     text: frequency,
                     onPressed: () {
+                      // Actualizar la frecuencia para la proteína actual
                       final proteinFrequency = {
                         'protein': currentProtein,
                         'frequency': frequency,
@@ -628,14 +641,19 @@ class QuestionWidgetUpdated extends ConsumerWidget {
                         proteinFrequency as Map<String, String>,
                       ];
 
-                      // Actualizar ambos valores
+                      // Actualizar las frecuencias
                       ref.read(questionsProvider.notifier).updateAnswer(
                           'protein_frequencies', updatedFrequencies);
 
-                      // Avanzar a la siguiente pregunta
-                      ref
-                          .read(questionsProvider.notifier)
-                          .answerQuestion(question.id, proteinFrequency);
+                      // Pasar a la siguiente proteína
+                      ref.read(questionsProvider.notifier).nextProtein();
+
+                      // Si no hay más proteínas, avanzar a la siguiente pregunta
+                      if (state.remainingProteins.length <= 1) {
+                        ref
+                            .read(questionsProvider.notifier)
+                            .answerQuestion(question.id, updatedFrequencies);
+                      }
                     },
                     color: categoryColor,
                     isPrimary: false,
