@@ -71,10 +71,13 @@ class AppStartupScreen extends ConsumerWidget {
         }
 
         // Usuario autenticado, verificar el perfil
+        print('🔄 AppStartupScreen - Iniciando userProfileAsync.when()');
         return userProfileAsync.when(
           data: (userProfile) {
+            print(
+                '📦 AppStartupScreen - Estado del perfil: ${userProfile != null ? "Perfil encontrado" : "Perfil null"}');
             if (userProfile == null) {
-              // Esperar a que el perfil se cargue
+              print('⏳ AppStartupScreen - Esperando carga del perfil...');
               return const Scaffold(
                 body: Center(
                   child: CircularProgressIndicator(),
@@ -90,16 +93,23 @@ class AppStartupScreen extends ConsumerWidget {
             // Si todo está completo, mostrar el dashboard
             return const DashboardScreen();
           },
-          loading: () => const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
-          error: (error, stack) => Scaffold(
-            body: Center(
-              child: Text('Error: $error'),
-            ),
-          ),
+          loading: () {
+            print('⌛ AppStartupScreen - Estado: loading');
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          },
+          error: (error, stack) {
+            print('❌ AppStartupScreen - Error: $error');
+            print('📜 AppStartupScreen - Stack: $stack');
+            return Scaffold(
+              body: Center(
+                child: Text('Error: $error'),
+              ),
+            );
+          },
         );
       },
       loading: () => const Scaffold(

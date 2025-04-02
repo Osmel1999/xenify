@@ -19,14 +19,33 @@ class FirestoreService {
 
   // Obtener perfil de usuario
   Future<UserProfile?> getUserProfile(String uid) async {
+    print('📡 FirestoreService - Iniciando obtención de perfil para UID: $uid');
     try {
+      print('🔍 FirestoreService - Buscando documento en colección users...');
       final doc = await _usersCollection.doc(uid).get();
-      if (doc.exists && doc.data() != null) {
-        return UserProfile.fromJson(doc.data() as Map<String, dynamic>);
+
+      if (!doc.exists) {
+        print('⚠️ FirestoreService - No existe documento para el UID: $uid');
+        return null;
       }
-      return null;
+
+      if (doc.data() == null) {
+        print(
+            '⚠️ FirestoreService - Documento existe pero está vacío para UID: $uid');
+        return null;
+      }
+
+      print(
+          '✅ FirestoreService - Documento encontrado, intentando deserializar...');
+      final data = doc.data() as Map<String, dynamic>;
+      print('📄 FirestoreService - Datos raw del documento: $data');
+
+      final profile = UserProfile.fromJson(data);
+      print('✅ FirestoreService - Perfil deserializado exitosamente');
+      return profile;
     } catch (e) {
-      print('Error al obtener perfil de usuario: $e');
+      print('❌ FirestoreService - Error al obtener perfil de usuario: $e');
+      print('❌ FirestoreService - Stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
@@ -68,6 +87,22 @@ class FirestoreService {
       print('Campos actualizados con éxito: ${fields.keys.join(', ')}');
     } catch (e) {
       print('Error al actualizar campos del perfil: $e');
+      rethrow;
+    }
+  }
+
+  // Guardar respuestas del cuestionario inicial
+  Future<void> saveQuestionnaireAnswers(
+      String uid, Map<String, dynamic> answers) async {
+    try {
+      print('📝 Guardando respuestas del cuestionario en Firestore');
+      await _usersCollection.doc(uid).update({
+        'initialQuestionnaire': answers,
+        'questionnaireCompletedAt': DateTime.now().toIso8601String(),
+      });
+      print('✅ Respuestas del cuestionario guardadas exitosamente');
+    } catch (e) {
+      print('❌ Error al guardar respuestas del cuestionario: $e');
       rethrow;
     }
   }

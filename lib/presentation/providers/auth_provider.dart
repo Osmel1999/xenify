@@ -23,15 +23,30 @@ final authStateProvider = StreamProvider<User?>((ref) {
 // Provider del perfil de usuario
 final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   final authState = ref.watch(authStateProvider);
+  print(
+      '🔍 UserProfileProvider - Estado de autenticación: ${authState.value != null ? "Autenticado" : "No autenticado"}');
 
   // Si no hay usuario autenticado, retornar null
   if (authState.value == null) {
+    print('❌ UserProfileProvider - Usuario no autenticado, retornando null');
     return null;
   }
 
+  print(
+      '👤 UserProfileProvider - Intentando obtener perfil para UID: ${authState.value!.uid}');
+
   // Obtener perfil del usuario
   final firestoreService = ref.watch(firestoreServiceProvider);
-  return await firestoreService.getUserProfile(authState.value!.uid);
+  try {
+    final profile = await firestoreService.getUserProfile(authState.value!.uid);
+    print(profile != null
+        ? '✅ UserProfileProvider - Perfil obtenido exitosamente: ${profile.toString()}'
+        : '⚠️ UserProfileProvider - No se encontró perfil para el usuario');
+    return profile;
+  } catch (e) {
+    print('❌ UserProfileProvider - Error al obtener perfil: $e');
+    rethrow;
+  }
 });
 
 // Notifier para gestionar el estado de autenticación

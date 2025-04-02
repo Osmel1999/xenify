@@ -101,18 +101,85 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
   }
 
   void updateAnswer(String questionId, dynamic answer) {
+    print('🔄 Actualizando respuesta para pregunta: $questionId');
+    print('📝 Nueva respuesta: $answer');
+
     final newAnswers = {...state.answers, questionId: answer};
     state = state.copyWith(answers: newAnswers);
+
+    print('✅ Respuesta actualizada exitosamente');
   }
 
-  void completeQuestionnaire() async {
+  Future<void> completeQuestionnaire() async {
     try {
+      print('🔄 Iniciando proceso de completar cuestionario...');
+
+      // Obtener los servicios necesarios
+      final firestoreService = providerContainer.read(firestoreServiceProvider);
+      final authService = providerContainer.read(authServiceProvider);
+
+      // Obtener el usuario actual directamente del AuthService
+      final user = authService.currentUser;
+
+      if (user == null) {
+        print('❌ Error inesperado: No se pudo obtener el usuario actual');
+        throw Exception('Error al obtener el usuario actual');
+      }
+
+      print('👤 Usuario actual: ${user.uid}');
+      print('📦 Preparando respuestas para guardar...');
+
+      // Preparar una copia limpia de las respuestas
+      Map<String, dynamic> answersToSave = {};
+
+      // Procesar cada respuesta individualmente
+      state.answers.forEach((key, value) {
+        try {
+          if (value == null) {
+            answersToSave[key] = null;
+          } else if (value is LocationData) {
+            print('🗺️ Convirtiendo LocationData para $key');
+            answersToSave[key] = value.toJson();
+          } else if (value is DateTime) {
+            print('🕒 Convirtiendo DateTime para $key');
+            answersToSave[key] = value.toIso8601String();
+          } else if (value is List) {
+            print('📝 Procesando lista para $key');
+            answersToSave[key] = value.map((item) {
+              if (item is Medication) {
+                return item.toJson();
+              } else if (item is FamilyCondition) {
+                return item.toJson();
+              } else {
+                return item;
+              }
+            }).toList();
+          } else {
+            // Para tipos simples (String, int, bool, etc)
+            answersToSave[key] = value;
+          }
+        } catch (e) {
+          print('⚠️ Error procesando respuesta para $key: $e');
+          print('⚠️ Tipo de valor: ${value.runtimeType}');
+          rethrow;
+        }
+      });
+
+      print('💾 Guardando respuestas en Firestore...');
+      await firestoreService.saveQuestionnaireAnswers(user.uid, answersToSave);
+
+      // Marcar como completado
+      print('✅ Marcando cuestionario como completado...');
       final authNotifier =
           providerContainer.read(authNotifierProvider.notifier);
       await authNotifier.markInitialQuestionnaireCompleted();
+
+      // Actualizar estado local
       state = state.copyWith(isCompleted: true);
+      print('✨ Proceso de completar cuestionario finalizado exitosamente');
     } catch (e) {
-      print('Error al completar cuestionario: $e');
+      print('❌ Error al completar cuestionario: $e');
+      rethrow;
     }
   }
 
@@ -257,93 +324,8 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
       nextIndex = questionsList.indexWhere((q) => q.id == 'has_family_history');
     } else if (questionId == 'has_family_history' && answer == false) {
       nextIndex = questionsList.indexWhere((q) => q.id == 'digestive_issues');
-    } else if (questionId == 'diet_type') {
-      // Manejar el flujo especial para el tipo de dieta
-      print('🍽️ Tipo de dieta seleccionado: $answer');
-
-      // Buscar la pregunta de proteínas correspondiente según la dieta
-      String proteinQuestionId = '';
-      switch (answer) {
-        case 'Omnívora':
-          proteinQuestionId = 'protein_sources_omnivore';
-          break;
-        case 'Vegetariana':
-          proteinQuestionId = 'protein_sources_vegetarian';
-          break;
-        case 'Vegana':
-          proteinQuestionId = 'protein_sources_vegan';
-          break;
-        case 'Sin gluten':
-          proteinQuestionId = 'protein_sources_glutenfree';
-          break;
-      }
-
-      // Buscar el índice de la pregunta de proteínas correspondiente
-      final proteinQuestionIndex =
-          questionsList.indexWhere((q) => q.id == proteinQuestionId);
-      if (proteinQuestionIndex != -1) {
-        nextIndex = proteinQuestionIndex;
-      }
     }
 
-    // Verificar si la siguiente pregunta tiene dependencias que no se cumplen
-    while (nextIndex < questionsList.length) {
-      Question nextQuestion = questionsList[nextIndex];
-
-      // Si la pregunta tiene un parentId, verificar dependencias
-      if (nextQuestion.parentId != null && nextQuestion.dependsOn != null) {
-        String parentId = nextQuestion.parentId!;
-
-        // Obtener la respuesta a la pregunta padre
-        dynamic parentAnswer = answers[parentId];
-        print(
-            '🔄 Verificando dependencia: Pregunta ${nextQuestion.id} depende de $parentId = $parentAnswer');
-
-        // Si es una pregunta de selección múltiple, verificar si alguna de las opciones coincide
-        bool dependencyMet = false;
-
-        if (parentAnswer is String &&
-            nextQuestion.dependsOn!.contains(parentAnswer)) {
-          dependencyMet = true;
-        } else if (parentAnswer is List<String>) {
-          // Para preguntas multiselect, verificar si hay alguna coincidencia
-          for (String option in parentAnswer) {
-            if (nextQuestion.dependsOn!.contains(option)) {
-              dependencyMet = true;
-              break;
-            }
-          }
-        }
-
-        // Si no se cumple la dependencia, buscar la siguiente pregunta sin dependencia o con dependencia cumplida
-        if (!dependencyMet) {
-          print(
-              '❌ Dependencia no cumplida para ${nextQuestion.id}, buscando siguiente pregunta válida');
-
-          // Buscar la siguiente pregunta sin parentId o con un parentId diferente
-          bool foundNextValid = false;
-          for (int i = nextIndex + 1; i < questionsList.length; i++) {
-            if (questionsList[i].parentId != parentId) {
-              nextIndex = i;
-              foundNextValid = true;
-              break;
-            }
-          }
-
-          // Si no encontramos una pregunta válida, llegar al final
-          if (!foundNextValid) {
-            nextIndex = questionsList.length;
-          }
-
-          continue; // Verificar la nueva pregunta encontrada
-        }
-      }
-
-      // Si llegamos aquí, la pregunta es válida para mostrar
-      break;
-    }
-
-    print('➡️ Siguiente índice de pregunta: $nextIndex');
     return nextIndex;
   }
 

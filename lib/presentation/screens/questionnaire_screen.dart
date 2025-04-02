@@ -159,18 +159,51 @@ class _QuestionnaireScreenState extends ConsumerState<QuestionnaireScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: () {
-                // Retrasar la navegación para permitir que se vea la animación
+              onPressed: () async {
                 if (!mounted) return;
-                // Marcar como completado en Firebase
-                ref.read(questionsProvider.notifier).completeQuestionnaire();
 
-                // Navegar al dashboard
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => const DashboardScreen(),
+                // Mostrar indicador de carga
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(
+                    child: CircularProgressIndicator(),
                   ),
                 );
+
+                try {
+                  // Intentar completar el cuestionario y guardar las respuestas
+                  await ref
+                      .read(questionsProvider.notifier)
+                      .completeQuestionnaire();
+
+                  if (!mounted) return;
+
+                  // Cerrar el diálogo de carga
+                  Navigator.pop(context);
+
+                  // Navegar al dashboard
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => const DashboardScreen(),
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+
+                  // Cerrar el diálogo de carga
+                  Navigator.pop(context);
+
+                  // Mostrar error al usuario
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          'Error al guardar las respuestas: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
               },
               child: const Text('Finalizar'),
             ),
