@@ -3,11 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:xenify/presentation/providers/auth_provider.dart';
 import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart';
+import 'package:xenify/presentation/screens/daily_questionnaire_screen.dart';
 import 'package:xenify/presentation/widgets/common/wellbeing_indicator_widget.dart';
 import 'package:xenify/domain/entities/daily_questionnaire.dart';
 
 class HeaderWidget extends ConsumerWidget {
   const HeaderWidget({Key? key}) : super(key: key);
+
+  String _getFirstName(String? fullName) {
+    if (fullName == null || fullName.isEmpty) return 'Usuario';
+
+    // Buscar el primer espacio para separar el primer nombre
+    final spaceIndex = fullName.indexOf(' ');
+    if (spaceIndex == -1)
+      return fullName; // Si no hay espacio, retornar el nombre completo
+
+    return fullName.substring(0, spaceIndex);
+  }
 
   String _getMoodText(int? mood) {
     if (mood == null) return 'N/A';
@@ -102,7 +114,7 @@ class HeaderWidget extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '¡Hola, ${userProfile?.displayName ?? 'Usuario'}!',
+                    '¡Hola, ${_getFirstName(userProfile?.displayName)}!',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -118,23 +130,82 @@ class HeaderWidget extends ConsumerWidget {
                 ],
               ),
               const Spacer(),
-              if (lastQuestionnaire != null) ...[
-                WellbeingIndicatorCompactWidget(
-                  '${lastQuestionnaire.sleepQuality ?? 'N/A'}h',
-                  Icons.bedtime,
-                  Theme.of(context).primaryColor,
-                ),
-                WellbeingIndicatorCompactWidget(
-                  _getEnergyText(lastQuestionnaire.energyLevel),
-                  Icons.battery_5_bar_rounded,
-                  Theme.of(context).primaryColor.withOpacity(0.7),
-                ),
-                WellbeingIndicatorCompactWidget(
-                  _getMoodText(lastQuestionnaire.mood),
-                  _getMoodIcon(lastQuestionnaire.mood),
-                  Theme.of(context).primaryColor,
-                ),
-              ],
+              Consumer(
+                builder: (context, ref, _) {
+                  final questionnaireNotifier =
+                      ref.watch(currentQuestionnaireProvider.notifier);
+                  final shouldShow = dailyQuestionnaireService
+                          .shouldShowQuestionnaire(QuestionnaireType.morning) ||
+                      dailyQuestionnaireService
+                          .shouldShowQuestionnaire(QuestionnaireType.evening);
+
+                  if (shouldShow) {
+                    return TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const DailyQuestionnaireScreen(),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.add_task,
+                          color: Theme.of(context).primaryColor),
+                      label: Text(
+                        'Completar cuestionario',
+                        style: TextStyle(
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Mostrar indicadores si hay un cuestionario completado
+                  if (lastQuestionnaire != null) {
+                    return Row(
+                      children: [
+                        WellbeingIndicatorCompactWidget(
+                          '${lastQuestionnaire.sleepQuality ?? 'N/A'}h',
+                          Icons.bedtime,
+                          Theme.of(context).primaryColor,
+                        ),
+                        WellbeingIndicatorCompactWidget(
+                          _getEnergyText(lastQuestionnaire.energyLevel),
+                          Icons.battery_5_bar_rounded,
+                          Theme.of(context).primaryColor.withOpacity(0.7),
+                        ),
+                        WellbeingIndicatorCompactWidget(
+                          _getMoodText(lastQuestionnaire.mood),
+                          _getMoodIcon(lastQuestionnaire.mood),
+                          Theme.of(context).primaryColor,
+                        ),
+                      ],
+                    );
+                  }
+
+                  // Si no hay cuestionario ni está en horario, mostrar indicadores vacíos
+                  return Row(
+                    children: [
+                      WellbeingIndicatorCompactWidget(
+                        'N/A',
+                        Icons.bedtime,
+                        Theme.of(context).primaryColor.withOpacity(0.5),
+                      ),
+                      WellbeingIndicatorCompactWidget(
+                        'N/A',
+                        Icons.battery_5_bar_rounded,
+                        Theme.of(context).primaryColor.withOpacity(0.5),
+                      ),
+                      WellbeingIndicatorCompactWidget(
+                        'N/A',
+                        Icons.sentiment_neutral,
+                        Theme.of(context).primaryColor.withOpacity(0.5),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ],
           );
         },

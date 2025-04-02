@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xenify/data/auth_service.dart';
 import 'package:xenify/data/firestore_service.dart';
+import 'package:xenify/data/daily_questionnaire_service.dart';
 import 'package:xenify/domain/entities/user_profile.dart';
+import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart';
 
 // Provider del servicio de autenticación
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -53,10 +55,12 @@ final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
 class AuthNotifier extends StateNotifier<AuthStatus> {
   final AuthService _authService;
   final FirestoreService _firestoreService;
+  final DailyQuestionnaireService _dailyQuestionnaireService;
   final Ref _ref;
   UserProfile? _currentProfile;
 
-  AuthNotifier(this._ref, this._authService, this._firestoreService)
+  AuthNotifier(this._ref, this._authService, this._firestoreService,
+      this._dailyQuestionnaireService)
       : super(AuthStatus.initial);
 
   // Getter para el perfil de usuario actual
@@ -105,15 +109,27 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
     try {
       final user = _authService.currentUser;
       if (user != null) {
+        print('🔄 Marcando cuestionario inicial como completado...');
+
+        // Actualizar en Firestore
         await _firestoreService.markInitialQuestionnaireCompleted(user.uid);
+
+        // Actualizar el perfil en memoria
         if (_currentProfile != null) {
           _currentProfile =
               _currentProfile!.copyWith(completedInitialQuestionnaire: true);
         }
+
+        // Marcar el setup inicial como completado en DailyQuestionnaireService
+        await _dailyQuestionnaireService.setInitialSetupCompleted(true);
+
+        print('✅ Setup inicial marcado como completado');
+
+        // Refrescar el provider del perfil
         _ref.refresh(userProfileProvider);
       }
     } catch (e) {
-      print('Error al marcar cuestionario como completado: $e');
+      print('❌ Error al marcar cuestionario como completado: $e');
       rethrow;
     }
   }
@@ -152,5 +168,6 @@ final authNotifierProvider =
     ref,
     ref.watch(authServiceProvider),
     ref.watch(firestoreServiceProvider),
+    ref.watch(dailyQuestionnaireServiceProvider),
   );
 });

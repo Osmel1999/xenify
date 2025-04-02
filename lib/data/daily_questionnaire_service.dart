@@ -15,15 +15,42 @@ class DailyQuestionnaireService {
 
   DailyQuestionnaireService(this._prefs);
 
-  bool get isInitialSetupCompleted => _prefs.getBool(_initialSetupKey) ?? false;
+  bool get isInitialSetupCompleted {
+    final completed = _prefs.getBool(_initialSetupKey) ?? false;
+    print(
+        '🔍 Verificando setup inicial: ${completed ? 'Completado' : 'Pendiente'}');
+    return completed;
+  }
 
   Future<void> setInitialSetupCompleted(bool completed) async {
+    print(
+        '${completed ? '✅' : '❌'} Marcando setup inicial como ${completed ? 'completado' : 'pendiente'}');
     await _prefs.setBool(_initialSetupKey, completed);
+
+    if (completed) {
+      // Crear cuestionarios iniciales si es necesario según la hora actual
+      final now = DateTime.now();
+      final currentHour = now.hour;
+
+      if (currentHour >= 5 && currentHour < 11) {
+        print('📝 Creando cuestionario matutino inicial');
+        await saveDailyQuestionnaire(
+            createNewQuestionnaire(QuestionnaireType.morning));
+      } else if (currentHour >= 18 && currentHour < 23) {
+        print('📝 Creando cuestionario nocturno inicial');
+        await saveDailyQuestionnaire(
+            createNewQuestionnaire(QuestionnaireType.evening));
+      }
+    }
   }
 
   Future<void> saveDailyQuestionnaire(DailyQuestionnaire questionnaire) async {
-    // Si el setup inicial no está completado, no guardamos cuestionarios
-    if (!isInitialSetupCompleted) return;
+    // Verificar el setup inicial
+    if (!isInitialSetupCompleted) {
+      print(
+          '⚠️ Setup inicial no completado. No se pueden guardar cuestionarios.');
+      return;
+    }
 
     final key = questionnaire.isMorning ? _morningKey : _eveningKey;
     await _prefs.setString(key, jsonEncode(questionnaire.toJson()));
@@ -32,8 +59,11 @@ class DailyQuestionnaireService {
   }
 
   DailyQuestionnaire? getTodayQuestionnaire(QuestionnaireType type) {
-    // Si el setup inicial no está completado, no mostramos cuestionarios
-    if (!isInitialSetupCompleted) return null;
+    // Verificar el setup inicial
+    if (!isInitialSetupCompleted) {
+      print('⚠️ Setup inicial no completado. No se mostrarán cuestionarios.');
+      return null;
+    }
 
     final key = type == QuestionnaireType.morning ? _morningKey : _eveningKey;
     final data = _prefs.getString(key);
@@ -51,8 +81,11 @@ class DailyQuestionnaireService {
   }
 
   bool shouldShowQuestionnaire(QuestionnaireType type) {
-    // Si el setup inicial no está completado, no mostramos cuestionarios
-    if (!isInitialSetupCompleted) return false;
+    // Verificar el setup inicial
+    if (!isInitialSetupCompleted) {
+      print('⚠️ Setup inicial no completado. No se mostrarán cuestionarios.');
+      return false;
+    }
 
     final now = DateTime.now();
     final currentHour = now.hour;

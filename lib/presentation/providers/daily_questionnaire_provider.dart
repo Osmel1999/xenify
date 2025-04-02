@@ -34,30 +34,43 @@ class CurrentQuestionnaireNotifier extends StateNotifier<DailyQuestionnaire?> {
     final now = DateTime.now();
     final currentHour = now.hour;
 
-    // Determinar qué tipo de cuestionario mostrar basado en la hora
-    QuestionnaireType type;
-    if (currentHour >= 5 && currentHour < 11) {
-      type = QuestionnaireType.morning;
-    } else if (currentHour >= 18 && currentHour < 23) {
-      type = QuestionnaireType.evening;
-    } else {
-      state = null;
-      return;
+    print('🕒 Verificando cuestionarios a las $currentHour:${now.minute}');
+
+    // Verificar cuestionario matutino pendiente
+    final morningQuestionnaire =
+        _service.getTodayQuestionnaire(QuestionnaireType.morning);
+    final eveningQuestionnaire =
+        _service.getTodayQuestionnaire(QuestionnaireType.evening);
+
+    // Si es hora del cuestionario nocturno y el matutino está pendiente
+    if (currentHour >= 18 && currentHour < 23) {
+      if (morningQuestionnaire == null || !morningQuestionnaire.isCompleted) {
+        print(
+            '📝 Creando cuestionario combinado (matutino pendiente + nocturno)');
+        // Crear nuevo cuestionario nocturno que incluirá preguntas matutinas
+        state = _service.createNewQuestionnaire(QuestionnaireType.evening);
+        return;
+      } else {
+        // Solo crear cuestionario nocturno si es necesario
+        if (eveningQuestionnaire == null || !eveningQuestionnaire.isCompleted) {
+          print('📝 Creando cuestionario nocturno');
+          state = _service.createNewQuestionnaire(QuestionnaireType.evening);
+          return;
+        }
+      }
+    }
+    // Horario matutino
+    else if (currentHour >= 5 && currentHour < 11) {
+      if (morningQuestionnaire == null || !morningQuestionnaire.isCompleted) {
+        print('📝 Creando cuestionario matutino');
+        state = _service.createNewQuestionnaire(QuestionnaireType.morning);
+        return;
+      }
     }
 
-    // Verificar si ya existe un cuestionario para hoy
-    final existingQuestionnaire = _service.getTodayQuestionnaire(type);
-    if (existingQuestionnaire != null && !existingQuestionnaire.isCompleted) {
-      state = existingQuestionnaire;
-      return;
-    }
-
-    // Si no hay cuestionario o ya está completado, verificar si debemos mostrar uno nuevo
-    if (_service.shouldShowQuestionnaire(type)) {
-      state = _service.createNewQuestionnaire(type);
-    } else {
-      state = null;
-    }
+    // Si no hay cuestionario pendiente para la hora actual
+    print('✅ No hay cuestionarios pendientes para este horario');
+    state = null;
   }
 
   Future<void> saveQuestionnaire(DailyQuestionnaire questionnaire) async {
@@ -96,11 +109,67 @@ class CurrentQuestionnaireNotifier extends StateNotifier<DailyQuestionnaire?> {
   void completeQuestionnaire() async {
     if (state == null) return;
 
-    final completedQuestionnaire = state!.copyWith(isCompleted: true);
-    await _service.saveDailyQuestionnaire(completedQuestionnaire);
-    state = completedQuestionnaire;
+    try {
+      print('🔄 Completando cuestionario ${state!.type}...');
+      final completedQuestionnaire = state!.copyWith(isCompleted: true);
+      final morningQuestionnaire =
+          _service.getTodayQuestionnaire(QuestionnaireType.morning);
+      final eveningQuestionnaire =
+          _service.getTodayQuestionnaire(QuestionnaireType.evening);
 
-    // Verificar si necesitamos cargar el siguiente cuestionario
-    _checkAndLoadQuestionnaire();
+      // Caso 1: Cuestionario nocturno con matutino pendiente (cuestionario combinado)
+      if (state!.type == QuestionnaireType.evening &&
+          (morningQuestionnaire == null || !morningQuestionnaire.isCompleted)) {
+        print('📝 Procesando cuestionario combinado...');
+
+        // Crear o actualizar cuestionario matutino con campos compartidos
+        final updatedMorningQuestionnaire = (morningQuestionnaire ??
+                _service.createNewQuestionnaire(QuestionnaireType.morning))
+            .copyWith(
+          // Solo sincronizar campos que tienen sentido compartir
+          energyLevel: completedQuestionnaire.energyLevel,
+          mood: completedQuestionnaire.mood,
+          isCompleted: true,
+          // No sincronizar campos específicos del momento:
+          // - sleepQuality (específico de la mañana)
+          // - bathroomEntries (específicos de cada momento)
+          // - meals (específicos de cada momento)
+        );
+
+        print('💾 Guardando cuestionario matutino con datos compartidos');
+        await _service.saveDailyQuestionnaire(updatedMorningQuestionnaire);
+      }
+      // Caso 2: Cuestionario matutino cuando ya existe el nocturno completado
+      else if (state!.type == QuestionnaireType.morning &&
+          eveningQuestionnaire != null &&
+          eveningQuestionnaire.isCompleted) {
+        print(
+            '🔄 Actualizando respuestas compartidas con cuestionario nocturno...');
+        // Actualizar el nocturno con los valores más recientes
+        final updatedEveningQuestionnaire = eveningQuestionnaire.copyWith(
+          energyLevel: completedQuestionnaire.energyLevel,
+          mood: completedQuestionnaire.mood,
+        );
+        await _service.saveDailyQuestionnaire(updatedEveningQuestionnaire);
+      }
+
+      // Guardar el cuestionario actual
+      print('💾 Guardando cuestionario ${state!.type}');
+      await _service.saveDailyQuestionnaire(completedQuestionnaire);
+      state = completedQuestionnaire;
+
+      print('✅ Cuestionario completado exitosamente');
+      print('📊 Estado final de cuestionarios:');
+      print(
+          '- Matutino: ${_service.getTodayQuestionnaire(QuestionnaireType.morning)?.isCompleted ?? false}');
+      print(
+          '- Nocturno: ${_service.getTodayQuestionnaire(QuestionnaireType.evening)?.isCompleted ?? false}');
+
+      // Verificar si hay más cuestionarios pendientes
+      _checkAndLoadQuestionnaire();
+    } catch (e) {
+      print('❌ Error al completar cuestionario: $e');
+      rethrow;
+    }
   }
 }
