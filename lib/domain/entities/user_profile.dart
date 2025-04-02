@@ -3,6 +3,7 @@ class UserProfile {
   final String displayName;
   final String? email;
   final String? photoURL;
+  final String? gender; // 'Masculino', 'Femenino', null para no especificado
   final DateTime createdAt;
   final DateTime lastLoginAt;
   final bool completedInitialQuestionnaire;
@@ -12,6 +13,7 @@ class UserProfile {
     required this.displayName,
     this.email,
     this.photoURL,
+    this.gender,
     required this.createdAt,
     required this.lastLoginAt,
     this.completedInitialQuestionnaire = false,
@@ -23,6 +25,7 @@ class UserProfile {
       'displayName': displayName,
       'email': email,
       'photoURL': photoURL,
+      'gender': gender,
       'createdAt': createdAt.toIso8601String(),
       'lastLoginAt': lastLoginAt.toIso8601String(),
       'completedInitialQuestionnaire': completedInitialQuestionnaire,
@@ -36,6 +39,7 @@ class UserProfile {
           json['displayName'] ?? 'Usuario', // Valor predeterminado si es nulo
       email: json['email'],
       photoURL: json['photoURL'],
+      gender: json['gender'],
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
           : DateTime.now(), // Valor predeterminado si es nulo
@@ -60,6 +64,7 @@ class UserProfile {
     String? displayName,
     String? email,
     String? photoURL,
+    String? gender,
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? completedInitialQuestionnaire,
@@ -69,6 +74,7 @@ class UserProfile {
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
       photoURL: photoURL ?? this.photoURL,
+      gender: gender ?? this.gender,
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       completedInitialQuestionnaire:

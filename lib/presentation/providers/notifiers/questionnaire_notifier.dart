@@ -307,23 +307,71 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
 
     int nextIndex = currentIndex + 1;
 
-    // Verificar flujos específicos basados en el ID de la pregunta
-    if (questionId == 'occupation_type') {
-      if (answer != 'Trabajo' && answer != 'Ambos') {
-        // Saltar a la pregunta después de 'work_details'
-        final workDetailsIndex =
-            questionsList.indexWhere((q) => q.id == 'work_details');
-        if (workDetailsIndex != -1 &&
-            workDetailsIndex < questionsList.length - 1) {
-          nextIndex = workDetailsIndex + 1;
+    // Buscar la siguiente pregunta válida
+    while (nextIndex < questionsList.length) {
+      final nextQuestion = questionsList[nextIndex];
+      bool shouldSkip = false;
+
+      // Verificar si la pregunta tiene dependencias
+      if (nextQuestion.parentId != null && nextQuestion.dependsOn != null) {
+        // Obtener la respuesta de la pregunta padre
+        final parentAnswer = answers[nextQuestion.parentId];
+
+        // Si no hay respuesta para la pregunta padre, saltar esta pregunta
+        if (parentAnswer == null) {
+          shouldSkip = true;
+        } else {
+          // Verificar si la respuesta cumple con las dependencias
+          bool dependencyMet = false;
+          if (parentAnswer is String) {
+            dependencyMet = nextQuestion.dependsOn!.contains(parentAnswer);
+          } else if (parentAnswer is List<String>) {
+            dependencyMet = parentAnswer
+                .any((answer) => nextQuestion.dependsOn!.contains(answer));
+          }
+
+          // Si no se cumple la dependencia, saltar esta pregunta
+          if (!dependencyMet) {
+            shouldSkip = true;
+          }
         }
       }
-    } else if (questionId == 'has_pathology' && answer == false) {
-      nextIndex = questionsList.indexWhere((q) => q.id == 'has_family_history');
-    } else if (questionId == 'current_treatment' && answer == false) {
-      nextIndex = questionsList.indexWhere((q) => q.id == 'has_family_history');
-    } else if (questionId == 'has_family_history' && answer == false) {
-      nextIndex = questionsList.indexWhere((q) => q.id == 'digestive_issues');
+
+      // Si esta pregunta debe saltarse, buscar la siguiente
+      if (shouldSkip) {
+        nextIndex++;
+        continue;
+      }
+
+      // Verificar flujos específicos basados en el ID de la pregunta
+      if (questionId == 'occupation_type' &&
+          answer != 'Trabajo' &&
+          answer != 'Ambos') {
+        if (nextQuestion.id == 'work_details') {
+          nextIndex++;
+          continue;
+        }
+      } else if (questionId == 'has_pathology' && answer == false) {
+        if (nextQuestion.id == 'pathology_name' ||
+            nextQuestion.id == 'current_treatment' ||
+            nextQuestion.id == 'medications') {
+          nextIndex++;
+          continue;
+        }
+      } else if (questionId == 'current_treatment' && answer == false) {
+        if (nextQuestion.id == 'medications') {
+          nextIndex++;
+          continue;
+        }
+      } else if (questionId == 'has_family_history' && answer == false) {
+        if (nextQuestion.id == 'family_conditions') {
+          nextIndex++;
+          continue;
+        }
+      }
+
+      // Si llegamos aquí, encontramos una pregunta válida
+      break;
     }
 
     return nextIndex;
