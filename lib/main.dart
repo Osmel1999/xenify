@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xenify/data/notification_service.dart';
+import 'package:xenify/data/provider_container.dart';
 import 'package:xenify/presentation/providers/auth_provider.dart';
 import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart';
 import 'package:xenify/presentation/screens/auth_screen.dart';
@@ -27,12 +28,22 @@ void main() async {
 
   // Inicializar SharedPreferences
   final prefs = await SharedPreferences.getInstance();
+  print('✅ SharedPreferences inicializado correctamente');
 
+  // Inicializar el container global con SharedPreferences
+  initializeProviderContainer(prefs);
+
+  // Crear un container local con el mismo override
+  final container = ProviderContainer(
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+    ],
+  );
+
+  // Usar el container para ejecutar la app
   runApp(
-    ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
+    UncontrolledProviderScope(
+      container: container,
       child: const MyApp(),
     ),
   );
@@ -69,6 +80,14 @@ class AppStartupScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Verificar que SharedPreferences esté disponible
+    try {
+      final _ = ref.read(sharedPreferencesProvider);
+      print('✅ SharedPreferences disponible en AppStartupScreen');
+    } catch (e) {
+      print('❌ Error accediendo a SharedPreferences: $e');
+    }
+
     // Observar tanto el estado de autenticación como el perfil del usuario
     final authState = ref.watch(authStateProvider);
     final userProfileAsync = ref.watch(userProfileProvider);

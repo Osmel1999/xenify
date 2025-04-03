@@ -34,20 +34,26 @@ class CurrentQuestionnaireNotifier extends StateNotifier<DailyQuestionnaire?> {
     final now = DateTime.now();
     final currentHour = now.hour;
 
-    print('🕒 Verificando cuestionarios a las $currentHour:${now.minute}');
+    print('\n📋 Verificando estado de cuestionarios:');
+    print('🕒 Hora actual: $currentHour:${now.minute}');
 
-    // Verificar cuestionario matutino pendiente
+    // Obtener estado actual de cuestionarios
     final morningQuestionnaire =
         _service.getTodayQuestionnaire(QuestionnaireType.morning);
     final eveningQuestionnaire =
         _service.getTodayQuestionnaire(QuestionnaireType.evening);
 
+    print('\n📊 Estado actual:');
+    print(
+        '- Matutino: ${morningQuestionnaire?.isCompleted == true ? "Completado" : "Pendiente"}');
+    print(
+        '- Nocturno: ${eveningQuestionnaire?.isCompleted == true ? "Completado" : "Pendiente"}');
+
     // Si es hora del cuestionario nocturno y el matutino está pendiente
     if (currentHour >= 18 && currentHour < 23) {
       if (morningQuestionnaire == null || !morningQuestionnaire.isCompleted) {
-        print(
-            '📝 Creando cuestionario combinado (matutino pendiente + nocturno)');
-        // Crear nuevo cuestionario nocturno que incluirá preguntas matutinas
+        print('\n🌙 Horario nocturno detectado con matutino pendiente');
+        print('📝 Creando cuestionario combinado (matutino + nocturno)');
         state = _service.createNewQuestionnaire(QuestionnaireType.evening);
         return;
       } else {
@@ -154,12 +160,12 @@ class CurrentQuestionnaireNotifier extends StateNotifier<DailyQuestionnaire?> {
       }
 
       // Guardar el cuestionario actual
-      print('💾 Guardando cuestionario ${state!.type}');
+      print('\n💾 Guardando cuestionario ${state!.type}');
       await _service.saveDailyQuestionnaire(completedQuestionnaire);
       state = completedQuestionnaire;
 
       print('✅ Cuestionario completado exitosamente');
-      print('📊 Estado final de cuestionarios:');
+      print('\n📊 Estado final de cuestionarios:');
       print(
           '- Matutino: ${_service.getTodayQuestionnaire(QuestionnaireType.morning)?.isCompleted ?? false}');
       print(

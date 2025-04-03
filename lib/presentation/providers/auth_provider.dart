@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xenify/data/auth_service.dart';
 import 'package:xenify/data/firestore_service.dart';
 import 'package:xenify/data/daily_questionnaire_service.dart';
+import 'package:xenify/data/local_storage.dart';
 import 'package:xenify/domain/entities/user_profile.dart';
 import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart';
 
@@ -35,19 +36,48 @@ final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
   }
 
   print(
-      '👤 UserProfileProvider - Intentando obtener perfil para UID: ${authState.value!.uid}');
+      '👤 UserProfileProvider - Intentando obtener perfil desde almacenamiento local');
 
-  // Obtener perfil del usuario
-  final firestoreService = ref.watch(firestoreServiceProvider);
   try {
-    final profile = await firestoreService.getUserProfile(authState.value!.uid);
-    print(profile != null
-        ? '✅ UserProfileProvider - Perfil obtenido exitosamente: ${profile.toString()}'
-        : '⚠️ UserProfileProvider - No se encontró perfil para el usuario');
-    return profile;
+    // Intentar obtener el perfil desde el almacenamiento local
+    final profile = await LocalStorage.loadUserProfile();
+    final dailyQuestionnaireService =
+        ref.watch(dailyQuestionnaireServiceProvider);
+
+    if (profile != null) {
+      print('✅ UserProfileProvider - Perfil obtenido desde local storage');
+      // Sincronizar el estado del setup inicial
+      await dailyQuestionnaireService
+          .syncInitialSetupWithFirestore(profile.completedInitialQuestionnaire);
+      return profile;
+    }
+
+    print('⚠️ UserProfileProvider - No se encontró perfil en local storage');
+
+    // Si no hay perfil en local storage, intentar obtenerlo de Firestore
+    print('🔄 UserProfileProvider - Intentando obtener perfil desde Firestore');
+    final firestoreService = ref.read(firestoreServiceProvider);
+    final uid = authState.value!.uid;
+
+    final firestoreProfile = await firestoreService.getUserProfile(uid);
+
+    if (firestoreProfile != null) {
+      print('✅ UserProfileProvider - Perfil obtenido desde Firestore');
+      // Guardar el perfil en el almacenamiento local para futuros accesos
+      await LocalStorage.saveUserProfile(firestoreProfile);
+
+      // Sincronizar el estado del setup inicial
+      await dailyQuestionnaireService.syncInitialSetupWithFirestore(
+          firestoreProfile.completedInitialQuestionnaire);
+
+      return firestoreProfile;
+    }
+
+    print('❌ UserProfileProvider - No se encontró perfil en Firestore');
+    return null;
   } catch (e) {
     print('❌ UserProfileProvider - Error al obtener perfil: $e');
-    rethrow;
+    return null;
   }
 });
 
@@ -73,6 +103,10 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
 
       if (userProfile != null) {
         _currentProfile = userProfile;
+
+        // Guardar el perfil en el almacenamiento local
+        await LocalStorage.saveUserProfile(userProfile);
+        print('✅ Perfil guardado en almacenamiento local');
 
         // Verificar si el perfil requiere completarse
         if (_authService.profileRequiresCompletion(userProfile)) {
@@ -105,31 +139,38 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
     }
   }
 
-  Future<void> markInitialQuestionnaireCompleted() async {
+  Future<void> markInitialQuestionnaireCompleted(
+      Map<String, dynamic> answers) async {
     try {
       final user = _authService.currentUser;
       if (user != null) {
-        print('🔄 Marcando cuestionario inicial como completado...');
+        print(
+            '🔄 Guardando cuestionario inicial y marcándolo como completado...');
 
-        // Actualizar en Firestore
-        await _firestoreService.markInitialQuestionnaireCompleted(user.uid);
+        // Actualizar en Firestore con las respuestas y marcar como completado
+        await _firestoreService.saveQuestionnaireAnswersAndComplete(
+            user.uid, answers);
 
         // Actualizar el perfil en memoria
         if (_currentProfile != null) {
           _currentProfile =
               _currentProfile!.copyWith(completedInitialQuestionnaire: true);
+
+          // Guardar el perfil actualizado en el almacenamiento local
+          await LocalStorage.saveUserProfile(_currentProfile!);
+          print('✅ Perfil actualizado guardado en almacenamiento local');
         }
 
         // Marcar el setup inicial como completado en DailyQuestionnaireService
         await _dailyQuestionnaireService.setInitialSetupCompleted(true);
 
-        print('✅ Setup inicial marcado como completado');
+        print('✅ Setup inicial guardado y marcado como completado');
 
         // Refrescar el provider del perfil
         _ref.refresh(userProfileProvider);
       }
     } catch (e) {
-      print('❌ Error al marcar cuestionario como completado: $e');
+      print('❌ Error al guardar y marcar cuestionario como completado: $e');
       rethrow;
     }
   }
@@ -147,6 +188,10 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
           displayName: fields['displayName'] ?? _currentProfile!.displayName,
           email: fields['email'] ?? _currentProfile!.email,
         );
+
+        // Guardar el perfil actualizado en el almacenamiento local
+        await LocalStorage.saveUserProfile(_currentProfile!);
+        print('✅ Perfil actualizado guardado en almacenamiento local');
       }
 
       // Recargar el perfil en el provider
@@ -155,7 +200,7 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
       state = AuthStatus.authenticated;
     } catch (e) {
       state = AuthStatus.error;
-      print('Error al actualizar campos del perfil: $e');
+      print('❌ Error al actualizar campos del perfil: $e');
       rethrow;
     }
   }

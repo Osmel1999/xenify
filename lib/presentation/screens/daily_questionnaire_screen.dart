@@ -6,6 +6,107 @@ import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart'
 class DailyQuestionnaireScreen extends ConsumerWidget {
   const DailyQuestionnaireScreen({super.key});
 
+  bool _isNightQuestionnaireCombined(
+      DailyQuestionnaire questionnaire, WidgetRef ref) {
+    if (questionnaire.isMorning) return false;
+
+    final dailyQuestionnaireService =
+        ref.read(dailyQuestionnaireServiceProvider);
+    final morningQuestionnaire = dailyQuestionnaireService
+        .getTodayQuestionnaire(QuestionnaireType.morning);
+
+    return !questionnaire.isMorning &&
+        (morningQuestionnaire?.isCompleted ?? false) == false;
+  }
+
+  bool _canComplete(DailyQuestionnaire questionnaire, WidgetRef ref) {
+    final dailyQuestionnaireService =
+        ref.read(dailyQuestionnaireServiceProvider);
+    final morningQuestionnaire = dailyQuestionnaireService
+        .getTodayQuestionnaire(QuestionnaireType.morning);
+
+    final isCombined = !questionnaire.isMorning &&
+        (morningQuestionnaire?.isCompleted ?? false) == false;
+
+    print('🔍 Verificando completitud del cuestionario:');
+    print(
+        '- Tipo: ${isCombined ? "Combinado" : questionnaire.isMorning ? "Matutino" : "Nocturno"}');
+
+    // Para cuestionario combinado o matutino
+    if (isCombined || questionnaire.isMorning) {
+      final canComplete = questionnaire.sleepQuality != null &&
+          questionnaire.energyLevel != null &&
+          questionnaire.mood != null &&
+          questionnaire.meals.isNotEmpty &&
+          questionnaire.bathroomEntries.isNotEmpty;
+
+      print('- Sleep Quality: ${questionnaire.sleepQuality != null}');
+      print('- Energy Level: ${questionnaire.energyLevel != null}');
+      print('- Mood: ${questionnaire.mood != null}');
+      print('- Meals: ${questionnaire.meals.isNotEmpty}');
+      print('- Bathroom Entries: ${questionnaire.bathroomEntries.isNotEmpty}');
+      print('✅ Puede completarse: $canComplete');
+
+      return canComplete;
+    }
+
+    // Para cuestionario nocturno normal
+    final canComplete = questionnaire.mood != null &&
+        questionnaire.meals.isNotEmpty &&
+        questionnaire.bathroomEntries.isNotEmpty;
+
+    print('- Mood: ${questionnaire.mood != null}');
+    print('- Meals: ${questionnaire.meals.isNotEmpty}');
+    print('- Bathroom Entries: ${questionnaire.bathroomEntries.isNotEmpty}');
+    print('✅ Puede completarse: $canComplete');
+
+    return canComplete;
+  }
+
+  void _showPendingFieldsDialog(
+      BuildContext context, DailyQuestionnaire questionnaire, WidgetRef ref) {
+    final List<String> pendingFields = [];
+
+    if (questionnaire.isMorning ||
+        _isNightQuestionnaireCombined(questionnaire, ref)) {
+      if (questionnaire.sleepQuality == null)
+        pendingFields.add('• Calidad del sueño');
+      if (questionnaire.energyLevel == null)
+        pendingFields.add('• Nivel de energía');
+    }
+
+    if (questionnaire.mood == null) pendingFields.add('• Estado de ánimo');
+    if (questionnaire.meals.isEmpty) pendingFields.add('• Registro de comidas');
+    if (questionnaire.bathroomEntries.isEmpty)
+      pendingFields.add('• Registro de baño');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Campos pendientes'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Por favor complete los siguientes campos:'),
+            const SizedBox(height: 8),
+            ...pendingFields.map((field) => Text(field)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _completeQuestionnaire(WidgetRef ref) {
+    ref.read(currentQuestionnaireProvider.notifier).completeQuestionnaire();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final questionnaire = ref.watch(currentQuestionnaireProvider);
@@ -16,11 +117,19 @@ class DailyQuestionnaireScreen extends ConsumerWidget {
       );
     }
 
+    final morningQuestionnaire = ref
+        .read(dailyQuestionnaireServiceProvider)
+        .getTodayQuestionnaire(QuestionnaireType.morning);
+    final isCombined = !questionnaire.isMorning &&
+        (morningQuestionnaire?.isCompleted ?? false) == false;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(questionnaire.isMorning
-            ? 'Cuestionario Matutino'
-            : 'Cuestionario Nocturno'),
+        title: Text(isCombined
+            ? 'Cuestionario Combinado'
+            : questionnaire.isMorning
+                ? 'Cuestionario Matutino'
+                : 'Cuestionario Nocturno'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -95,10 +204,25 @@ class DailyQuestionnaireScreen extends ConsumerWidget {
         const SizedBox(height: 32),
         Center(
           child: ElevatedButton(
-            onPressed: _canComplete(questionnaire)
-                ? () => _completeQuestionnaire(ref)
-                : null,
-            child: const Text('Completar Cuestionario'),
+            onPressed: () {
+              final canComplete = _canComplete(questionnaire, ref);
+              if (canComplete) {
+                _completeQuestionnaire(ref);
+              } else {
+                _showPendingFieldsDialog(context, questionnaire, ref);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _canComplete(questionnaire, ref)
+                  ? Theme.of(context).primaryColor
+                  : Colors.grey,
+            ),
+            child: Text(
+              _canComplete(questionnaire, ref)
+                  ? 'Completar Cuestionario'
+                  : 'Campos pendientes',
+              style: const TextStyle(color: Colors.white),
+            ),
           ),
         ),
       ],
@@ -299,17 +423,6 @@ class DailyQuestionnaireScreen extends ConsumerWidget {
       ),
     );
   }
-
-  bool _canComplete(DailyQuestionnaire questionnaire) {
-    return questionnaire.sleepQuality != null &&
-        questionnaire.energyLevel != null &&
-        questionnaire.mood != null &&
-        questionnaire.meals.isNotEmpty;
-  }
-
-  void _completeQuestionnaire(WidgetRef ref) {
-    ref.read(currentQuestionnaireProvider.notifier).completeQuestionnaire();
-  }
 }
 
 class _BathroomEntryDialog extends StatefulWidget {
@@ -391,6 +504,7 @@ class _BathroomEntryDialogState extends State<_BathroomEntryDialog> {
                 timestamp: DateTime.now(),
               ));
             }
+            Navigator.of(context).pop();
           },
           child: const Text('Guardar'),
         ),

@@ -1,142 +1,107 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:xenify/domain/entities/user_profile.dart';
 
+/// Servicio para gestionar operaciones con Firestore
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Colección de usuarios
+  /// Colección de usuarios
   CollectionReference get _usersCollection => _firestore.collection('users');
 
-  // Guardar perfil de usuario
-  Future<void> saveUserProfile(UserProfile profile) async {
-    try {
-      await _usersCollection.doc(profile.uid).set(profile.toJson());
-    } catch (e) {
-      print('Error al guardar perfil de usuario: $e');
-      rethrow;
-    }
-  }
-
-  // Obtener perfil de usuario
+  /// Obtener el perfil de usuario desde Firestore
   Future<UserProfile?> getUserProfile(String uid) async {
-    print('📡 FirestoreService - Iniciando obtención de perfil para UID: $uid');
     try {
-      print('🔍 FirestoreService - Buscando documento en colección users...');
-      final doc = await _usersCollection.doc(uid).get();
+      print('🔍 FirestoreService - Buscando perfil con uid: $uid');
+      final docSnapshot = await _usersCollection.doc(uid).get();
 
-      if (!doc.exists) {
-        print('⚠️ FirestoreService - No existe documento para el UID: $uid');
-        return null;
-      }
-
-      if (doc.data() == null) {
-        print(
-            '⚠️ FirestoreService - Documento existe pero está vacío para UID: $uid');
-        return null;
+      if (docSnapshot.exists && docSnapshot.data() != null) {
+        print('✅ FirestoreService - Perfil encontrado en Firestore');
+        final data = docSnapshot.data() as Map<String, dynamic>;
+        return UserProfile.fromJson({
+          ...data,
+          'uid': uid, // Asegurar que el uid esté presente
+        });
       }
 
       print(
-          '✅ FirestoreService - Documento encontrado, intentando deserializar...');
-      final data = doc.data() as Map<String, dynamic>;
-      print('📄 FirestoreService - Datos raw del documento: $data');
-
-      final profile = UserProfile.fromJson(data);
-      print('✅ FirestoreService - Perfil deserializado exitosamente');
-      return profile;
+          '⚠️ FirestoreService - No existe perfil en Firestore para uid: $uid');
+      return null;
     } catch (e) {
-      print('❌ FirestoreService - Error al obtener perfil de usuario: $e');
-      print('❌ FirestoreService - Stack trace: ${StackTrace.current}');
+      print('❌ FirestoreService - Error obteniendo perfil: $e');
+      return null;
+    }
+  }
+
+  /// Guardar o actualizar un perfil de usuario
+  Future<void> saveUserProfile(UserProfile profile) async {
+    try {
+      await _usersCollection.doc(profile.uid).set(
+            profile.toJson(),
+            SetOptions(merge: true),
+          );
+      print('✅ FirestoreService - Perfil guardado correctamente');
+    } catch (e) {
+      print('❌ FirestoreService - Error guardando perfil: $e');
       rethrow;
     }
   }
 
-  // Actualizar el último inicio de sesión
-  Future<void> updateUserLastLogin(String uid, DateTime lastLogin) async {
+  /// Actualizar la última fecha de inicio de sesión del usuario
+  Future<void> updateUserLastLogin(String uid, DateTime loginTime) async {
     try {
       await _usersCollection.doc(uid).update({
-        'lastLoginAt': lastLogin.toIso8601String(),
+        'lastLoginAt': loginTime.toIso8601String(),
       });
+      print(
+          '✅ FirestoreService - Última fecha de inicio de sesión actualizada');
     } catch (e) {
-      print('Error al actualizar último inicio de sesión: $e');
+      print(
+          '❌ FirestoreService - Error actualizando fecha de inicio de sesión: $e');
       rethrow;
     }
   }
 
-  // Marcar que el usuario completó el cuestionario inicial
-  Future<void> markInitialQuestionnaireCompleted(String uid) async {
+  /// Guardar respuestas del cuestionario inicial y marcar como completado
+  Future<void> saveQuestionnaireAnswersAndComplete(
+      String uid, Map<String, dynamic> answers) async {
     try {
       await _usersCollection.doc(uid).update({
+        'initialQuestionnaire': answers,
         'completedInitialQuestionnaire': true,
+        'profileCompletedAt': FieldValue.serverTimestamp(),
       });
+      print(
+          '✅ FirestoreService - Cuestionario inicial guardado y marcado como completado');
     } catch (e) {
-      print('Error al marcar cuestionario como completado: $e');
+      print('❌ FirestoreService - Error guardando cuestionario: $e');
       rethrow;
     }
   }
 
-  // Nuevo método para actualizar campos específicos del perfil de usuario
+  /// Actualizar campos específicos del perfil de usuario
   Future<void> updateUserProfileFields(
       String uid, Map<String, dynamic> fields) async {
     try {
-      // Convertir cualquier objeto complejo a formato JSON si es necesario
-      final fieldsToUpdate = _prepareFieldsForFirestore(fields);
-
-      // Actualizar solo los campos especificados
-      await _usersCollection.doc(uid).update(fieldsToUpdate);
-
-      print('Campos actualizados con éxito: ${fields.keys.join(', ')}');
+      await _usersCollection.doc(uid).update(fields);
+      print('✅ FirestoreService - Campos del perfil actualizados');
     } catch (e) {
-      print('Error al actualizar campos del perfil: $e');
+      print('❌ FirestoreService - Error actualizando campos: $e');
       rethrow;
     }
   }
 
-  // Guardar respuestas del cuestionario inicial
-  Future<void> saveQuestionnaireAnswers(
-      String uid, Map<String, dynamic> answers) async {
+  /// Verificar si el setup inicial está completado
+  Future<bool> isInitialSetupCompleted(String uid) async {
     try {
-      print('📝 Guardando respuestas del cuestionario en Firestore');
-      await _usersCollection.doc(uid).update({
-        'initialQuestionnaire': answers,
-        'questionnaireCompletedAt': DateTime.now().toIso8601String(),
-      });
-      print('✅ Respuestas del cuestionario guardadas exitosamente');
-    } catch (e) {
-      print('❌ Error al guardar respuestas del cuestionario: $e');
-      rethrow;
-    }
-  }
-
-  // Método auxiliar para preparar campos para Firestore
-  Map<String, dynamic> _prepareFieldsForFirestore(Map<String, dynamic> fields) {
-    final result = <String, dynamic>{};
-
-    fields.forEach((key, value) {
-      if (value is DateTime) {
-        // Convertir DateTime a String ISO8601
-        result[key] = value.toIso8601String();
-      } else if (value is Iterable) {
-        // Convertir iterables a listas
-        result[key] = value.toList();
-      } else if (value is Map) {
-        // Convertir mapas anidados recursivamente
-        result[key] = _prepareFieldsForFirestore(value as Map<String, dynamic>);
-      } else {
-        // Mantener otros tipos sin cambios
-        result[key] = value;
+      final doc = await _usersCollection.doc(uid).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['completedInitialQuestionnaire'] == true;
       }
-    });
-
-    return result;
-  }
-
-  // Método para actualizar el perfil completo
-  Future<void> updateUserProfile(UserProfile profile) async {
-    try {
-      await _usersCollection.doc(profile.uid).update(profile.toJson());
+      return false;
     } catch (e) {
-      print('Error al actualizar perfil de usuario: $e');
-      rethrow;
+      print('❌ FirestoreService - Error verificando setup inicial: $e');
+      return false;
     }
   }
 }

@@ -9,6 +9,8 @@ import 'package:xenify/domain/entities/questionnaire_state.dart';
 import 'package:xenify/domain/entities/location_data.dart';
 import 'package:xenify/presentation/providers/auth_provider.dart';
 import 'package:xenify/presentation/providers/questionnaire_provider.dart';
+import 'package:xenify/presentation/providers/daily_questionnaire_provider.dart';
+import 'package:xenify/data/daily_questionnaire_service.dart';
 
 class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
   final NotificationService _notificationService;
@@ -117,6 +119,10 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
       // Obtener los servicios necesarios
       final firestoreService = providerContainer.read(firestoreServiceProvider);
       final authService = providerContainer.read(authServiceProvider);
+      final prefs = providerContainer.read(sharedPreferencesProvider);
+
+      // Crear una instancia del servicio con el SharedPreferences del provider
+      final dailyQuestionnaireService = DailyQuestionnaireService(prefs);
 
       // Obtener el usuario actual directamente del AuthService
       final user = authService.currentUser;
@@ -165,14 +171,19 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
         }
       });
 
-      print('💾 Guardando respuestas en Firestore...');
-      await firestoreService.saveQuestionnaireAnswers(user.uid, answersToSave);
+      print(
+          '💾 Guardando respuestas y marcando como completado en Firestore...');
+      await firestoreService.saveQuestionnaireAnswersAndComplete(
+          user.uid, answersToSave);
 
-      // Marcar como completado
-      print('✅ Marcando cuestionario como completado...');
+      // Actualizar estado local usando DailyQuestionnaireService
+      print('🔄 Actualizando estado del cuestionario inicial...');
+      await dailyQuestionnaireService.syncInitialSetupWithFirestore(true);
+
+      // Actualizar estado del auth provider
       final authNotifier =
           providerContainer.read(authNotifierProvider.notifier);
-      await authNotifier.markInitialQuestionnaireCompleted();
+      await authNotifier.markInitialQuestionnaireCompleted(answersToSave);
 
       // Actualizar estado local
       state = state.copyWith(isCompleted: true);
